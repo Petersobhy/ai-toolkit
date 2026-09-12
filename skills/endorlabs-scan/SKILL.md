@@ -2,7 +2,7 @@
 name: endorlabs-scan
 description: "Run Endorlabs security investigations using the endor-cli-tools MCP. Trigger words: 'endorlabs', 'endor scan', 'scan for vulnerabilities', 'check dependencies', 'CVE lookup', 'security scan', 'dependency risks'."
 when_to_use: "Use when asked to: scan a repo for vulnerabilities, check a dependency for CVEs, investigate security risks, look up a CVE in Endorlabs, run a security review on code changes, or audit open source dependencies. Accepts optional arguments: severity (critical|high|medium|all, default: high) and repo name."
-allowed-tools: mcp__endor-cli-tools__get_resource mcp__endor-cli-tools__check_dependency_for_vulnerabilities mcp__endor-cli-tools__check_dependency_for_risks mcp__endor-cli-tools__get_endor_vulnerability mcp__endor-cli-tools__security_review mcp__endor-cli-tools__scan
+allowed-tools: mcp__endor-cli-tools__get_resource mcp__endor-cli-tools__check_dependency_for_vulnerabilities mcp__endor-cli-tools__check_dependency_for_risks mcp__endor-cli-tools__get_endor_vulnerability mcp__endor-cli-tools__security_review
 arguments:
   - name: severity
     description: "Minimum severity to surface. Options: critical, high, medium, all. Default: high"
@@ -136,6 +136,6 @@ Do **not** create Jira tickets automatically — suggest the action and let the 
 ## Notes
 
 - Always fetch existing results first — `get_resource` queries the Endorlabs platform and requires no special network access beyond `api.endorlabs.com`.
-- The `scan` tool runs endorctl locally and needs access to `api.oss.endorlabs.com` — use only as a last resort when the repo is not yet onboarded.
+- The `scan` tool runs endorctl locally (reads source files) and sends data to `api.oss.endorlabs.com`. It is intentionally excluded from `allowed-tools` — use it only as a last resort when the repo is not yet onboarded, and only after the user explicitly approves the tool call.
 - Do not invoke `endorctl` directly from the CLI — always use the MCP tools.
 - This skill investigates a specific repo or package. For a bulk estate-wide digest across all namespaces, use the `endor-digest` skill instead.
