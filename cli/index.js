@@ -8,7 +8,7 @@ const os = require('os');
 const REPO = 'Petersobhy/ai-toolkit';
 const BRANCH = 'main';
 const SKILLS_PATH = 'skills';
-const INSTALL_DIR = path.join(os.homedir(), '.claude', 'agents');
+const INSTALL_DIR = path.join(os.homedir(), '.claude', 'commands');
 const SCRIPTS_DIR = path.join(os.homedir(), '.ai-toolkit', 'scripts');
 
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
@@ -75,7 +75,7 @@ async function installSkill(name, manifest = {}) {
     return false;
   }
 
-  // Install SKILL.md → ~/.claude/agents/<name>.md
+  // Install SKILL.md → ~/.claude/commands/<name>.md
   const skillContent = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/SKILL.md`);
   fs.mkdirSync(INSTALL_DIR, { recursive: true });
   fs.writeFileSync(path.join(INSTALL_DIR, `${name}.md`), skillContent);
