@@ -56,7 +56,7 @@ Verify it is installed:
 ls ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs
 ```
 
-If missing, reinstall the skill: `npx @petersobhy/ai-toolkit add sonarcloud-scan`
+If missing, reinstall the skill: `npx @petersobhy/ai-toolkit@1.11.3 add sonarcloud-scan`
 
 ---
 

@@ -64,7 +64,7 @@ Verify it is installed:
 ls ~/.ai-toolkit/scripts/defender-scan/scan.mjs
 ```
 
-If missing, reinstall: `npx @petersobhy/ai-toolkit add defender-scan`
+If missing, reinstall: `npx @petersobhy/ai-toolkit@1.11.3 add defender-scan`
 
 ---
 
@@ -98,11 +98,11 @@ Defender for Cloud surfaces three distinct finding types — all returned in a s
 - **severity**: from the user's **explicit** request only, or default `critical`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script. **Never expand severity on the user's behalf** — if the user said "find vulnerabilities" without specifying a severity, use `critical`. Only use `all` when the user explicitly asks for all severities or a full picture.
 - **categories**: from user request or default `vulnerabilities,container`. Valid values: `vulnerabilities`, `alerts`, `recommendations`, `compute`, `networking`, `data`, `container`, `identityandaccess`, `appservices`.
 - **resource-group**: from user request, or omit for full subscription scan. If provided, must contain only alphanumeric characters, hyphens, and underscores — reject if it contains shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `\`).
-- **AZURE_SUBSCRIPTION_ID**: check env var first. If unset, auto-detect silently:
+- **AZURE_SUBSCRIPTION_ID**: check env var first. If unset, auto-detect from the active az CLI session:
   ```bash
   export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
   ```
-  Do not ask the user — resolve it automatically. Only fail if `az account show` itself fails (not logged in).
+  This is a read-only metadata call — no write operations are performed. Only fail if `az account show` itself fails (not logged in).
 
 ### 1. Run the scan script
 

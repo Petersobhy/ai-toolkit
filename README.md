@@ -16,10 +16,10 @@ A growing library of reusable AI skills for Claude Code — each addition maps t
 Requires Node 18+. No additional dependencies.
 
 ```bash
-npx @petersobhy/ai-toolkit list                  # see available skills
-npx @petersobhy/ai-toolkit add endorlabs-scan    # install one skill
-npx @petersobhy/ai-toolkit add --all             # install all skills
-npx @petersobhy/ai-toolkit update                # update installed skills
+npx @petersobhy/ai-toolkit@1.11.3 list                  # see available skills
+npx @petersobhy/ai-toolkit@1.11.3 add endorlabs-scan    # install one skill
+npx @petersobhy/ai-toolkit@1.11.3 add --all             # install all skills
+npx @petersobhy/ai-toolkit@1.11.3 update                # update installed skills
 ```
 
 Skills are installed to `~/.claude/agents/` — no skill file ever lands in a client repo. Restart Claude Code after installing.
