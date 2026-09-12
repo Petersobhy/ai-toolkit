@@ -1,0 +1,22 @@
+# SkillSpector baseline — findings listed here are suppressed on future scans.
+# Edit 'reason' fields and add glob 'rules' as needed. See docs/SUPPRESSION.md.
+version: 2
+scanner_version: 2.11.2
+rules: []
+fingerprints:
+- hash: sha256:08bd467bac3419953047b58047857282cd0f5de7126cda7004c779a1381780e0
+  rule_id: TM2
+  file: endorlabs-scan/lib.test.mjs
+  reason: "False positive — `; rm -rf` is the INPUT to a validateSeverity rejection test, not a chained tool call. The test verifies injection attempts are refused."
+- hash: sha256:ede22c82ac383a11b089fb7919c1b6ee9ee13f0271072dbc798b6be2ec28af73
+  rule_id: RP1
+  file: README.md
+  reason: "False positive — `npx @petersobhy/ai-toolkit@1` uses a major-version pin (@1). Exact patch pinning is intentionally avoided to prevent stale install docs on every release. @1 bounds to the v1.x semver range."
+- hash: sha256:a1f201f80f9cdbb546a7f86e451f7d0511e03a406e45703f2896651f2f6c1c53
+  rule_id: RA2
+  file: README.md
+  reason: "False positive — `~/.ai-toolkit/scripts/` is a one-time install path, not a cron job or startup script. No state is persisted across sessions."
+- hash: sha256:4c462863632af9252be703fa09d11bd3e9e11aa2debfb18307fe954df69bd6fe
+  rule_id: RA2
+  file: defender-scan/SKILL.md
+  reason: "False positive — `export AZURE_SUBSCRIPTION_ID=...` is a read-only shell variable assignment from `az account show`, not a persistence mechanism. Value is ephemeral to the current shell session."
