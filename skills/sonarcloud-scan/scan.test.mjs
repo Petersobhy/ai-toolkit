@@ -34,6 +34,16 @@ test('parseArgs: unknown flags do not crash', () => {
   assert.equal(result.severity, 'high');
 });
 
+test('parseArgs: --all sets all flag', () => {
+  const result = parseArgs(['--all', '--repo', 'svc']);
+  assert.equal(result.all, true);
+});
+
+test('parseArgs: all defaults to false', () => {
+  const result = parseArgs([]);
+  assert.equal(result.all, false);
+});
+
 // --- SEVERITY_FILTER mapping ---
 
 test('SEVERITY_FILTER: critical excludes MAJOR', () => {
@@ -215,7 +225,7 @@ test('paginate: collects all items from a single page', async () => {
   mock.restoreAll();
 });
 
-test('paginate: follows page numbers across two pages', async () => {
+test('paginate: follows page numbers across two pages when maxPages=Infinity', async () => {
   let call = 0;
   mock.method(https, 'get', (_url, _opts, cb) => {
     const req = fakeReq();
@@ -226,7 +236,7 @@ test('paginate: follows page numbers across two pages', async () => {
     setImmediate(() => cb(fakeRes(200, bodies[call++])));
     return req;
   });
-  const items = await paginate((p) => `https://sonarcloud.io/api/issues/search?p=${p}&ps=100`, 'tok', 'issues');
+  const items = await paginate((p) => `https://sonarcloud.io/api/issues/search?p=${p}&ps=100`, 'tok', 'issues', Infinity);
   assert.equal(items.length, 3);
   assert.equal(call, 2);
   mock.restoreAll();
@@ -236,6 +246,20 @@ test('paginate: returns empty array when key is absent', async () => {
   mockHttpGet(200, { paging: { total: 0 } });
   const items = await paginate(() => 'https://sonarcloud.io/api/issues/search', 'tok', 'issues');
   assert.deepEqual(items, []);
+  mock.restoreAll();
+});
+
+test('paginate: respects maxPages=1 and stops after first page', async () => {
+  let call = 0;
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq();
+    setImmediate(() => cb(fakeRes(200, { issues: [{ severity: 'CRITICAL' }], paging: { total: 50 } })));
+    call++;
+    return req;
+  });
+  const items = await paginate(() => 'https://sonarcloud.io/api/issues/search', 'tok', 'issues', 1);
+  assert.equal(items.length, 1);
+  assert.equal(call, 1); // only one page fetched
   mock.restoreAll();
 });
 
@@ -251,7 +275,7 @@ test('paginate: stops when batch is empty before reaching total', async () => {
     setImmediate(() => cb(fakeRes(200, bodies[call++])));
     return req;
   });
-  const items = await paginate((p) => `https://sonarcloud.io/api/issues/search?p=${p}&ps=100`, 'tok', 'issues');
+  const items = await paginate((p) => `https://sonarcloud.io/api/issues/search?p=${p}&ps=100`, 'tok', 'issues', Infinity);
   assert.equal(items.length, 1);
   assert.equal(call, 2);
   mock.restoreAll();

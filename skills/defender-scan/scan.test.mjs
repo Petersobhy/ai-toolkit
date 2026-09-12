@@ -36,6 +36,15 @@ test('parseArgs: short flags -s and -g', () => {
   assert.equal(r.resourceGroup, 'prod-rg');
 });
 
+test('parseArgs: --all sets all flag', () => {
+  const r = parseArgs(['--all']);
+  assert.equal(r.all, true);
+});
+
+test('parseArgs: all defaults to false', () => {
+  assert.equal(parseArgs([]).all, false);
+});
+
 // ---- SEVERITY_LEVELS ----
 
 test('SEVERITY_LEVELS: critical is only High', () => {
@@ -287,6 +296,36 @@ test('get: rejects on invalid JSON', async () => {
   mock.restoreAll();
 });
 
+test('get: retries on ECONNRESET then succeeds', async () => {
+  let call = 0;
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq();
+    if (call++ === 0) {
+      setImmediate(() => req.emit('error', Object.assign(new Error('ECONNRESET'), { code: 'ECONNRESET' })));
+    } else {
+      setImmediate(() => cb(fakeRes(200, { value: [] })));
+    }
+    return req;
+  });
+  const result = await get('https://example.com/api', 'tok', 30000, 3);
+  assert.deepEqual(result, { value: [] });
+  assert.equal(call, 2);
+  mock.restoreAll();
+});
+
+test('get: throws after exhausting retries on ECONNRESET', async () => {
+  mock.method(https, 'get', (_url, _opts, _cb) => {
+    const req = fakeReq();
+    setImmediate(() => req.emit('error', Object.assign(new Error('ECONNRESET'), { code: 'ECONNRESET' })));
+    return req;
+  });
+  await assert.rejects(
+    () => get('https://example.com/api', 'tok', 30000, 2),
+    /ECONNRESET/
+  );
+  mock.restoreAll();
+});
+
 // ---- paginate() ----
 
 test('paginate: collects all items from a single page', async () => {
@@ -296,7 +335,7 @@ test('paginate: collects all items from a single page', async () => {
   mock.restoreAll();
 });
 
-test('paginate: follows nextLink across two pages', async () => {
+test('paginate: follows nextLink across two pages when maxPages=Infinity', async () => {
   let call = 0;
   mock.method(https, 'get', (_url, _opts, cb) => {
     const req = fakeReq();
@@ -307,7 +346,7 @@ test('paginate: follows nextLink across two pages', async () => {
     setImmediate(() => cb(fakeRes(200, bodies[call++])));
     return req;
   });
-  const items = await paginate('https://example.com/api', 'tok');
+  const items = await paginate('https://example.com/api', 'tok', Infinity);
   assert.equal(items.length, 3);
   assert.equal(call, 2);
   mock.restoreAll();
@@ -317,5 +356,19 @@ test('paginate: returns empty array when value is absent', async () => {
   mockHttpGet(200, {});
   const items = await paginate('https://example.com/api', 'tok');
   assert.deepEqual(items, []);
+  mock.restoreAll();
+});
+
+test('paginate: respects maxPages=1 and stops after first page', async () => {
+  let call = 0;
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq();
+    setImmediate(() => cb(fakeRes(200, { value: [{ id: 'a' }], nextLink: 'https://example.com/api?page=2' })));
+    call++;
+    return req;
+  });
+  const items = await paginate('https://example.com/api', 'tok', 1);
+  assert.equal(items.length, 1);
+  assert.equal(call, 1);
   mock.restoreAll();
 });

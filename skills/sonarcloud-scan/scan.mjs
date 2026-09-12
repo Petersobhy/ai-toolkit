@@ -19,10 +19,11 @@ export const HOTSPOT_PROB_FILTER = {
 };
 
 export function parseArgs(argv) {
-  const out = { severity: 'high', repo: null };
+  const out = { severity: 'high', repo: null, all: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--severity' && argv[i + 1]) out.severity = argv[++i];
     else if (argv[i] === '--repo' && argv[i + 1]) out.repo = argv[++i];
+    else if (argv[i] === '--all') out.all = true;
   }
   return out;
 }
@@ -79,10 +80,10 @@ export function get(url, token, timeoutMs = 30000) {
   });
 }
 
-export async function paginate(buildUrl, token, key) {
+export async function paginate(buildUrl, token, key, maxPages = 1) {
   const items = [];
   let page = 1;
-  while (true) {
+  while (page <= maxPages) {
     const data = await get(buildUrl(page), token);
     const batch = data[key] ?? [];
     items.push(...batch);
@@ -95,7 +96,7 @@ export async function paginate(buildUrl, token, key) {
 }
 
 async function main() {
-  const { severity, repo } = parseArgs(process.argv.slice(2));
+  const { severity, repo, all } = parseArgs(process.argv.slice(2));
   const token = process.env.SONAR_TOKEN;
   const org   = process.env.SONAR_ORG;
 
@@ -104,6 +105,7 @@ async function main() {
   if (!repo)  { console.error('--repo is required');      process.exit(1); }
 
   const projectKey = `${org}:${repo}`;
+  const maxPages   = all ? Infinity : 1;
 
   try {
     await get(`${BASE}/components/show?component=${encodeURIComponent(projectKey)}`, token);
@@ -119,12 +121,12 @@ async function main() {
   const probFilter      = HOTSPOT_PROB_FILTER[severity] ?? HOTSPOT_PROB_FILTER.high;
 
   const vulnBase = `${BASE}/issues/search?componentKeys=${encodeURIComponent(projectKey)}&types=VULNERABILITY&statuses=OPEN,CONFIRMED,REOPENED&severities=${sonarSeverities}&organization=${encodeURIComponent(org)}`;
-  const rawVulns = await paginate(p => `${vulnBase}&p=${p}&ps=100`, token, 'issues');
+  const rawVulns = await paginate(p => `${vulnBase}&p=${p}&ps=100`, token, 'issues', maxPages);
 
   let rawHotspots = [];
   try {
     const hotspotBase = `${BASE}/hotspots/search?projectKey=${encodeURIComponent(projectKey)}&status=TO_REVIEW`;
-    rawHotspots = await paginate(p => `${hotspotBase}&p=${p}&ps=100`, token, 'hotspots');
+    rawHotspots = await paginate(p => `${hotspotBase}&p=${p}&ps=100`, token, 'hotspots', maxPages);
   } catch {
     // hotspots endpoint may be unavailable on free plans — skip silently
   }

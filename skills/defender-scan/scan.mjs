@@ -19,10 +19,11 @@ export const SEVERITY_LEVELS = {
 };
 
 export function parseArgs(argv) {
-  const out = { severity: 'high', resourceGroup: null };
+  const out = { severity: 'high', resourceGroup: null, all: false };
   for (let i = 0; i < argv.length; i++) {
     if ((argv[i] === '--severity' || argv[i] === '-s') && argv[i + 1]) out.severity = argv[++i];
     else if ((argv[i] === '--resource-group' || argv[i] === '-g') && argv[i + 1]) out.resourceGroup = argv[++i];
+    else if (argv[i] === '--all') out.all = true;
   }
   return out;
 }
@@ -140,7 +141,7 @@ function getToken() {
   return r.stdout.trim();
 }
 
-export function get(url, token, timeoutMs = 30000) {
+function getOnce(url, token, timeoutMs) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'ai-toolkit/defender-scan' },
@@ -160,50 +161,72 @@ export function get(url, token, timeoutMs = 30000) {
   });
 }
 
-export async function paginate(baseUrl, token) {
+export async function get(url, token, timeoutMs = 30000, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await getOnce(url, token, timeoutMs);
+    } catch (err) {
+      const retryable = err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT';
+      if (!retryable || attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+}
+
+export async function paginate(baseUrl, token, maxPages = 1) {
   const items = [];
   let url = baseUrl;
-  while (url) {
+  let page = 0;
+  while (url && page < maxPages) {
     const data = await get(url, token);
     items.push(...(data.value ?? []));
     url = data.nextLink ?? null;
+    page++;
   }
   return items;
 }
 
 async function main() {
-  const { severity, resourceGroup } = parseArgs(process.argv.slice(2));
+  const { severity, resourceGroup, all } = parseArgs(process.argv.slice(2));
   const sub = process.env.AZURE_SUBSCRIPTION_ID;
 
   if (!sub) { console.error('AZURE_SUBSCRIPTION_ID is not set'); process.exit(1); }
 
-  const levels = SEVERITY_LEVELS[severity] ?? SEVERITY_LEVELS.high;
-  const token  = getToken();
-  const base   = `${ARM}/subscriptions/${encodeURIComponent(sub)}`;
+  const levels   = SEVERITY_LEVELS[severity] ?? SEVERITY_LEVELS.high;
+  const token    = getToken();
+  const base     = `${ARM}/subscriptions/${encodeURIComponent(sub)}`;
   const rgFilter = resourceGroup ? `/resourceGroups/${encodeURIComponent(resourceGroup)}` : '';
+  const maxPages = all ? Infinity : 1;
 
-  // Fetch metadata for severity lookup (subscription-scoped, no RG filter)
-  const metaItems = await paginate(
-    `${base}/providers/Microsoft.Security/assessmentMetadata?api-version=${API_VERSIONS.assessmentMetadata}`,
-    token
+  // Fetch only Unhealthy assessments server-side — avoids pulling all assessments
+  const unhealthy = await paginate(
+    `${base}${rgFilter}/providers/Microsoft.Security/assessments?api-version=${API_VERSIONS.assessments}&$filter=properties/status/code eq 'Unhealthy'`,
+    token,
+    maxPages
   );
-  const metaByName = Object.fromEntries(metaItems.map(m => [m.name, m]));
 
-  // Fetch assessments (scoped to RG if provided)
-  const assessments = await paginate(
-    `${base}${rgFilter}/providers/Microsoft.Security/assessments?api-version=${API_VERSIONS.assessments}`,
-    token
+  // Fetch metadata only for the unique assessment types that appear in results, in parallel
+  // Avoids paginating through the full metadata catalogue (~500+ entries)
+  const uniqueNames = [...new Set(
+    unhealthy.filter(a => !a.properties?.additionalData?.CvesDetails).map(a => a.name)
+  )];
+  const metaResults = await Promise.all(
+    uniqueNames.map(name =>
+      get(`${base}/providers/Microsoft.Security/assessmentMetadata/${encodeURIComponent(name)}?api-version=${API_VERSIONS.assessmentMetadata}`, token)
+        .catch(() => null)
+    )
   );
-  const unhealthy = assessments.filter(a => a.properties?.status?.code === 'Unhealthy');
+  const metaByName = Object.fromEntries(uniqueNames.map((name, i) => [name, metaResults[i]]));
 
-  // Fetch alerts
+  // Fetch alerts filtered by severity server-side
   let alertItems = [];
   try {
+    const severityFilter = levels.map(l => `properties/severity eq '${l}'`).join(' or ');
     alertItems = await paginate(
-      `${base}/providers/Microsoft.Security/alerts?api-version=${API_VERSIONS.alerts}`,
-      token
+      `${base}/providers/Microsoft.Security/alerts?api-version=${API_VERSIONS.alerts}&$filter=${encodeURIComponent(severityFilter)}`,
+      token,
+      maxPages
     );
-    alertItems = alertItems.filter(a => levels.includes(a.properties?.severity));
   } catch { /* alerts endpoint may require Defender plan */ }
 
   // Fetch secure score (overall subscription score)
