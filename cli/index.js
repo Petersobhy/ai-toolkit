@@ -60,7 +60,7 @@ async function getSkillContents(name) {
   return entries; // array of { name, type, download_url, ... }
 }
 
-async function installSkill(name) {
+async function installSkill(name, manifest = {}) {
   let entries;
   try {
     entries = await getSkillContents(name);
@@ -96,7 +96,8 @@ async function installSkill(name) {
     }
   }
 
-  console.log(`  ✓ ${name}`);
+  const version = manifest[name]?.version;
+  console.log(`  ✓ ${name}${version ? ` v${version}` : ''}`);
   return true;
 }
 
@@ -122,7 +123,7 @@ async function cmdAdd(args) {
 
   const manifest = await fetchManifest();
   console.log(all ? `Installing all ${names.length} skills...\n` : `Installing ${names.length} skill(s)...\n`);
-  for (const name of names) await installSkill(name);
+  for (const name of names) await installSkill(name, manifest);
   printSetupHints(names, manifest);
   console.log('\nRestart Claude Code to activate installed skills.');
 }
@@ -135,7 +136,7 @@ async function cmdUpdate() {
   }
   const manifest = await fetchManifest();
   console.log(`Updating ${installed.length} installed skill(s)...\n`);
-  for (const name of installed) await installSkill(name);
+  for (const name of installed) await installSkill(name, manifest);
   printSetupHints(installed, manifest);
   console.log('\nRestart Claude Code to activate updated skills.');
 }
