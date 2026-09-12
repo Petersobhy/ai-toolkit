@@ -9,7 +9,9 @@ arguments:
     default: high
   - name: repo
     description: "Repository name to scan (e.g. my-service). Omit to infer from current git directory."
-argument-hint: "[severity: critical|high|medium|all] [repo-name]"
+  - name: all
+    description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
+argument-hint: "[severity: critical|high|medium|all] [repo-name] [--all]"
 metadata:
   version: 1.0.0
   setup-hint: "set SONAR_TOKEN, SONAR_ORG env vars"

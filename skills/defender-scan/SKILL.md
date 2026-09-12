@@ -9,7 +9,9 @@ arguments:
     default: high
   - name: resource-group
     description: "Azure resource group to limit scope (optional). Omit to scan the entire subscription."
-argument-hint: "[severity: critical|high|medium|all] [--resource-group <rg-name>]"
+  - name: all
+    description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
+argument-hint: "[severity: critical|high|medium|all] [--resource-group <rg-name>] [--all]"
 metadata:
   version: 1.0.0
   setup-hint: "set AZURE_SUBSCRIPTION_ID env var + run: az login"
