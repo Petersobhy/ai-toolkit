@@ -17,6 +17,8 @@ metadata:
 
 # Microsoft Defender for Cloud Scan
 
+> **Execute directly using Bash tool calls. Do not spawn subagents.**
+
 Use the Azure Security Center REST API to surface cloud posture recommendations, container/software CVEs, and active security alerts for an Azure subscription.
 
 > **This skill is part of the ai-toolkit scanner family.** It complements `endorlabs-scan` (OSS dependencies) and `sonarcloud-scan` (SAST/code). Defender covers **cloud posture and runtime threats** — misconfigurations, container vulnerabilities in ACR/AKS, VM patch gaps, and active alerts.

@@ -17,6 +17,8 @@ metadata:
 
 # SonarCloud Security Scan
 
+> **Execute directly using Bash tool calls. Do not spawn subagents.**
+
 Use the SonarCloud REST API to fetch existing vulnerability findings and security hotspots for a specific repository.
 
 > **This skill is part of the ai-toolkit scanner family.** It follows the same interface as `endorlabs-scan` — same severity arguments, same output format — so findings from multiple sources can be compared or merged.

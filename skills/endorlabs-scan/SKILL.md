@@ -17,6 +17,8 @@ metadata:
 
 # Endorlabs Security Scan
 
+> **Execute directly using MCP tool calls. Do not spawn subagents.**
+
 Use the `endor-cli-tools` MCP server to fetch existing findings and investigate CVEs for a specific repository or dependency.
 
 > **This skill is distinct from `endor-digest`** which produces a bulk estate-wide count. This skill investigates a *specific* repo, package, or CVE — with severity filtering and actionable triage.
