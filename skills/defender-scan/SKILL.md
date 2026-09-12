@@ -98,14 +98,20 @@ Defender uses High / Medium / Low / Informational (no "Critical" tier):
 ### 0. Resolve and validate arguments
 
 - **severity**: from user request or default `high`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
+- **categories**: from user request or default `vulnerabilities,alerts`. Valid values: `vulnerabilities`, `alerts`, `recommendations`, `compute`, `networking`, `data`, `container`, `identityandaccess`, `appservices`.
 - **resource-group**: from user request, or omit for full subscription scan. If provided, must contain only alphanumeric characters, hyphens, and underscores — reject if it contains shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `\`).
-- **AZURE_SUBSCRIPTION_ID**: from env var — fail clearly if unset.
+- **AZURE_SUBSCRIPTION_ID**: check env var first. If unset, auto-detect silently:
+  ```bash
+  export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+  ```
+  Do not ask the user — resolve it automatically. Only fail if `az account show` itself fails (not logged in).
 
 ### 1. Run the scan script
 
 ```bash
 node ~/.ai-toolkit/scripts/defender-scan/scan.mjs \
   --severity '<severity>' \
+  --categories '<categories>' \
   [--resource-group '<rg-name>']
 ```
 
@@ -146,29 +152,34 @@ For each fixable vulnerability, note the exact `fix_version` — this goes direc
 
 ### 4. Report findings
 
-**Secure Score:** X / Y (Z%) — include trend if available
+Always start the report with a header line showing what was fetched:
+> **Scan:** Ont-Prod1 · severity: high · categories: vulnerabilities, alerts · page 1 of results (pass --all for full scan)
 
-**Active Alerts:**
+**Secure Score:** X / Y (Z%) — if `secure_score` is null, state clearly: "Secure Score not available (requires Defender CSPM plan)" — do not silently omit it.
+
+**Active Alerts** (only if `alerts` category was requested):
 
 | Alert | Severity | Status | Compromised Resource |
 |---|---|---|---|
 | Suspicious login | High | Active | vm-prod-001 |
 
-**Software Vulnerabilities (fixable first):**
+If alerts array is empty, state: "No active alerts returned — verify Defender for Cloud alerts are enabled on this subscription."
 
-| Package | CVE | Severity | Fix Version | Resource | RG |
-|---|---|---|---|---|---|
-| netty-codec-http2 | CVE-2026-56819 | High | 4.2.16.Final | myacr | acr001-prod-rg |
+**Software Vulnerabilities** (only if `vulnerabilities` category was requested — fixable first, grouped by image):
 
-**Cloud Posture Recommendations:**
+| Package | Language | CVE | Severity | CVSS | Fix Version | Resource |
+|---|---|---|---|---|---|---|
+| netty-codec-http2 | java | CVE-2026-56819 | High | 7.5 | 4.2.16.Final | spark-fips |
 
-| Recommendation | Severity | Resource | Remediation |
-|---|---|---|---|
-| Enable MFA | High | Subscription | Go to Azure AD... |
+**Cloud Posture Recommendations** (only if `recommendations` or a resource category was requested):
+
+| Recommendation | Category | Severity | Resource | Remediation |
+|---|---|---|---|---|
+| Enable MFA | identityandaccess | High | Subscription | Go to Azure AD... |
 
 Follow with:
-- Overall risk summary
-- Top 3 immediate actions (patch this, fix that, enable this)
+- Overall risk summary (X High CVEs, Y Medium, Z fixable)
+- Top 3 immediate actions ranked by CVSS × volume
 - Suggested next action: open a ticket, apply the Dockerfile patch inline, or escalate to the security lead
 
 Do **not** create tickets automatically — suggest the action and let the user decide.
