@@ -64,7 +64,7 @@ Verify it is installed:
 ls ~/.ai-toolkit/scripts/defender-scan/scan.mjs
 ```
 
-If missing, reinstall: `npx @petersobhy/ai-toolkit@1.11.3 add defender-scan`
+If missing, reinstall: `npx @petersobhy/ai-toolkit@1 add defender-scan`
 
 ---
 
