@@ -9,7 +9,10 @@ arguments:
     default: high
   - name: repo
     description: "Repository name to scan (e.g. my-service). Omit to scan the current directory's repo."
-argument-hint: "[severity: critical|high|medium|all] [repo-name]"
+  - name: categories
+    description: "Comma-separated finding categories to fetch. Options: sca, vulnerability, secrets, security, operational. Default: sca,vulnerability"
+    default: "sca,vulnerability"
+argument-hint: "[severity: critical|high|medium|all] [repo-name] [--categories sca,vulnerability,secrets,security,operational]"
 metadata:
   version: 1.2.0
   setup-hint: "set ENDOR_NAMESPACE, ENDOR_ORG env vars + connect endor-cli-tools MCP"
@@ -76,7 +79,13 @@ If either is unset, stop and tell the user to set them before retrying.
 
 ### 0. Resolve arguments
 
-- **severity**: from user request or default `high`. Map to a filter: `critical` → level ≥ CRITICAL; `high` → level ≥ HIGH; `medium` → level ≥ MEDIUM; `all` → no filter.
+- **severity**: from user request or default `high`. Map to level filter: `critical` → `FINDING_LEVEL_CRITICAL`; `high` → `FINDING_LEVEL_HIGH,FINDING_LEVEL_CRITICAL`; `medium` → includes MEDIUM+; `all` → no level filter.
+- **categories**: from user request or default `sca,vulnerability`. Map each to Endor category values:
+  - `sca` → `FINDING_CATEGORY_SCA`
+  - `vulnerability` → `FINDING_CATEGORY_VULNERABILITY`
+  - `secrets` → `FINDING_CATEGORY_SECRETS`
+  - `security` → `FINDING_CATEGORY_SECURITY`
+  - `operational` → `FINDING_CATEGORY_OPERATIONAL`
 - **repo**: from user request, or infer from current directory name if running inside a git repo.
 - **namespace / org**: from `$ENDOR_NAMESPACE` and `$ENDOR_ORG`. If unset, stop with a clear error message.
 
@@ -98,12 +107,19 @@ get_resource(
 
 ### 2. Fetch existing findings
 
+Apply the category filter from Step 0. Build the `filter` expression as:
+```
+spec.finding_categories contains "FINDING_CATEGORY_SCA" or spec.finding_categories contains "FINDING_CATEGORY_VULNERABILITY"
+```
+(adjust the `or` clauses to match the resolved categories list)
+
 ```
 get_resource(
   resource_type: "Finding",
   namespace: "$ENDOR_NAMESPACE",
   name: "namespaces/$ENDOR_NAMESPACE/findings",
-  fields: ["uuid", "meta.name", "spec.finding_type", "spec.level", "spec.summary", "spec.remediation"]
+  filter: "<category filter expression>",
+  fields: ["uuid", "meta.name", "spec.level", "spec.summary", "spec.remediation", "spec.finding_categories", "spec.finding_tags", "spec.target_dependency_package_name", "spec.target_dependency_version", "spec.ecosystem"]
 )
 ```
 
@@ -112,20 +128,30 @@ get_resource(
 Apply the severity filter from Step 0. Group findings: **Critical → High → Medium → Low** (stop at the requested minimum severity).
 
 For each finding at or above the requested severity, capture:
-- Package name + version
-- CVE ID (call `get_endor_vulnerability` for full details if needed)
+- Category (from `spec.finding_categories` — e.g. SCA, Secrets, Security)
+- Package name + version (`spec.target_dependency_package_name`, `spec.target_dependency_version`)
+- CVE ID if applicable (call `get_endor_vulnerability` for full details if needed)
 - Whether a fix version exists (`spec.remediation`)
-- Reachability (if provided)
+- Reachability from `spec.finding_tags`: `FINDING_TAGS_REACHABLE_FUNCTION` = reachable, `FINDING_TAGS_POTENTIALLY_REACHABLE_FUNCTION` = potentially reachable
+- Fix available: `FINDING_TAGS_FIX_AVAILABLE` in tags
 
 Skip findings below the requested severity entirely — do not mention them unless the user asks.
 
 ### 4. Report findings
 
-Present a summary table for findings at or above the severity threshold:
+Present a summary table grouped by category:
 
-| Package | Version | CVE | Severity | Fix Available | Reachable |
-|---|---|---|---|---|---|
-| lodash | 4.17.15 | CVE-2021-23337 | High | 4.17.21 | Yes |
+**SCA / Vulnerability findings:**
+
+| Package | Version | Severity | Fix Available | Reachable |
+|---|---|---|---|---|
+| lodash | 4.17.15 | High | 4.17.21 | Yes |
+
+**Secrets findings (if requested):**
+
+| Location | Severity | Tag |
+|---|---|---|
+| src/config.ts:12 | Medium | Potentially Valid |
 
 Follow with:
 - A short paragraph on the overall risk posture

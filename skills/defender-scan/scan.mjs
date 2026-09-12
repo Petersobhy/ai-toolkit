@@ -18,12 +18,33 @@ export const SEVERITY_LEVELS = {
   all:      ['High', 'Medium', 'Low', 'Informational'],
 };
 
+// Real Defender categories from assessmentMetadata.properties.categories
+// vulnerabilities = CVE findings (Defender for Containers / CSPM)
+// alerts = active runtime threats
+// compute/networking/data/container/identityandaccess/appservices = posture recommendation types
+export const CATEGORIES = ['vulnerabilities', 'recommendations', 'alerts', 'compute', 'networking', 'data', 'container', 'identityandaccess', 'appservices'];
+export const DEFAULT_CATEGORIES = ['vulnerabilities', 'alerts'];
+
+// Map user-facing category names to Defender metadata category values
+const DEFENDER_CATEGORY_MAP = {
+  compute:          'Compute',
+  networking:       'Networking',
+  data:             'Data',
+  container:        'Container',
+  identityandaccess:'IdentityAndAccess',
+  appservices:      'AppServices',
+};
+
 export function parseArgs(argv) {
-  const out = { severity: 'high', resourceGroup: null, all: false };
+  const out = { severity: 'high', resourceGroup: null, all: false, categories: DEFAULT_CATEGORIES };
   for (let i = 0; i < argv.length; i++) {
     if ((argv[i] === '--severity' || argv[i] === '-s') && argv[i + 1]) out.severity = argv[++i];
     else if ((argv[i] === '--resource-group' || argv[i] === '-g') && argv[i + 1]) out.resourceGroup = argv[++i];
     else if (argv[i] === '--all') out.all = true;
+    else if (argv[i] === '--categories' && argv[i + 1]) {
+      const raw = argv[++i];
+      out.categories = raw === 'all' ? CATEGORIES : raw.split(',').map(c => c.trim().toLowerCase());
+    }
   }
   return out;
 }
@@ -81,6 +102,7 @@ export function buildRecommendation(assessment, metadata) {
     type:           'recommendation',
     name:           props.displayName ?? meta.displayName ?? assessment.name,
     severity:       sev,
+    categories:     (meta.categories ?? []).map(c => c.toLowerCase()),
     resource:       props.resourceDetails?.ResourceName ?? rgFromId(props.resourceDetails?.Id) ?? null,
     resource_group: rgFromId(props.resourceDetails?.Id ?? props.resourceDetails?.NativeResourceId),
     remediation:    meta.remediationDescription
@@ -187,7 +209,7 @@ export async function paginate(baseUrl, token, maxPages = 1) {
 }
 
 async function main() {
-  const { severity, resourceGroup, all } = parseArgs(process.argv.slice(2));
+  const { severity, resourceGroup, all, categories } = parseArgs(process.argv.slice(2));
   const sub = process.env.AZURE_SUBSCRIPTION_ID;
 
   if (!sub) { console.error('AZURE_SUBSCRIPTION_ID is not set'); process.exit(1); }
@@ -218,18 +240,27 @@ async function main() {
   );
   const metaByName = Object.fromEntries(uniqueNames.map((name, i) => [name, metaResults[i]]));
 
-  // Fetch alerts filtered by severity server-side
-  let alertItems = [];
-  try {
-    const severityFilter = levels.map(l => `properties/severity eq '${l}'`).join(' or ');
-    alertItems = await paginate(
-      `${base}/providers/Microsoft.Security/alerts?api-version=${API_VERSIONS.alerts}&$filter=${encodeURIComponent(severityFilter)}`,
-      token,
-      maxPages
-    );
-  } catch { /* alerts endpoint may require Defender plan */ }
+  // Resolve which top-level categories are requested
+  const wantVulns = categories.includes('vulnerabilities');
+  const wantAlerts = categories.includes('alerts');
+  // Recommendation sub-categories: compute, networking, data, container, identityandaccess, appservices
+  const recCategoryFilter = categories.filter(c => DEFENDER_CATEGORY_MAP[c]).map(c => DEFENDER_CATEGORY_MAP[c]);
+  const wantRecs = categories.includes('recommendations') || recCategoryFilter.length > 0;
 
-  // Fetch secure score (overall subscription score)
+  // Fetch alerts only if requested
+  let alertItems = [];
+  if (wantAlerts) {
+    try {
+      const severityFilter = levels.map(l => `properties/severity eq '${l}'`).join(' or ');
+      alertItems = await paginate(
+        `${base}/providers/Microsoft.Security/alerts?api-version=${API_VERSIONS.alerts}&$filter=${encodeURIComponent(severityFilter)}`,
+        token,
+        maxPages
+      );
+    } catch { /* alerts endpoint may require Defender plan */ }
+  }
+
+  // Fetch secure score (always — small call, useful context)
   let secureScore = null;
   try {
     const scores = await paginate(
@@ -239,21 +270,25 @@ async function main() {
     secureScore = scores.find(s => s.name === 'ascScore') ?? scores[0] ?? null;
   } catch { /* secure score may not be available */ }
 
-  // Build results
+  // Build results — filter by requested categories
   const vulnerabilities = [];
   const recommendations = [];
 
   for (const assessment of unhealthy) {
     const hasCves = assessment.properties?.additionalData?.CvesDetails;
     if (hasCves) {
+      if (!wantVulns) continue;
       const vuln = buildVulnerability(assessment, levels);
       if (vuln) vulnerabilities.push(vuln);
     } else {
+      if (!wantRecs) continue;
       const meta = metaByName[assessment.name];
       const sev  = meta?.properties?.severity;
-      if (sev && levels.includes(sev)) {
-        recommendations.push(buildRecommendation(assessment, meta));
-      }
+      if (!sev || !levels.includes(sev)) continue;
+      const rec = buildRecommendation(assessment, meta);
+      // Apply Defender sub-category filter if specific categories were requested
+      if (recCategoryFilter.length > 0 && !rec.categories.some(c => recCategoryFilter.map(x=>x.toLowerCase()).includes(c))) continue;
+      recommendations.push(rec);
     }
   }
 

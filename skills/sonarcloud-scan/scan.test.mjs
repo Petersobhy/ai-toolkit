@@ -10,6 +10,8 @@ import {
   buildResult,
   SEVERITY_FILTER,
   HOTSPOT_PROB_FILTER,
+  CATEGORIES,
+  DEFAULT_CATEGORIES,
   get,
   paginate,
 } from './scan.mjs';
@@ -20,6 +22,7 @@ test('parseArgs: defaults when no args', () => {
   const result = parseArgs([]);
   assert.equal(result.severity, 'high');
   assert.equal(result.repo, null);
+  assert.deepEqual(result.categories, DEFAULT_CATEGORIES);
 });
 
 test('parseArgs: reads --severity and --repo', () => {
@@ -42,6 +45,16 @@ test('parseArgs: --all sets all flag', () => {
 test('parseArgs: all defaults to false', () => {
   const result = parseArgs([]);
   assert.equal(result.all, false);
+});
+
+test('parseArgs: --categories parses comma-separated list', () => {
+  const result = parseArgs(['--categories', 'vulnerability,bug']);
+  assert.deepEqual(result.categories, ['vulnerability', 'bug']);
+});
+
+test('parseArgs: --categories all expands to full list', () => {
+  const result = parseArgs(['--categories', 'all']);
+  assert.deepEqual(result.categories, CATEGORIES);
 });
 
 // --- SEVERITY_FILTER mapping ---
@@ -87,12 +100,15 @@ test('stripProjectKey: handles null component', () => {
 // --- buildResult ---
 
 const projectKey = 'my-org:my-repo';
+const defaultCategories = ['vulnerability'];
 
-test('buildResult: maps vulnerabilities correctly', () => {
+test('buildResult: maps issues correctly', () => {
   const result = buildResult({
     projectKey,
     severity: 'high',
-    rawVulns: [{
+    categories: defaultCategories,
+    rawIssues: [{
+      type: 'VULNERABILITY',
       severity: 'CRITICAL',
       rule: 'ts:S2068',
       component: `${projectKey}:src/auth.ts`,
@@ -105,10 +121,11 @@ test('buildResult: maps vulnerabilities correctly', () => {
   });
 
   assert.equal(result.project, projectKey);
-  assert.equal(result.vulnerabilities.length, 1);
-  assert.equal(result.vulnerabilities[0].file, 'src/auth.ts');
-  assert.equal(result.vulnerabilities[0].severity, 'CRITICAL');
-  assert.equal(result.summary.total_vulnerabilities, 1);
+  assert.equal(result.issues.length, 1);
+  assert.equal(result.issues[0].file, 'src/auth.ts');
+  assert.equal(result.issues[0].severity, 'CRITICAL');
+  assert.equal(result.issues[0].category, 'vulnerability');
+  assert.equal(result.summary.total_issues, 1);
 });
 
 test('buildResult: filters hotspots by probability', () => {
@@ -121,9 +138,10 @@ test('buildResult: filters hotspots by probability', () => {
   const result = buildResult({
     projectKey,
     severity: 'high',
-    rawVulns: [],
+    categories: ['hotspot'],
+    rawIssues: [],
     rawHotspots: hotspots,
-    probFilter: HOTSPOT_PROB_FILTER.high, // ['HIGH', 'MEDIUM']
+    probFilter: HOTSPOT_PROB_FILTER.high,
   });
 
   assert.equal(result.hotspots.length, 2);
@@ -135,13 +153,22 @@ test('buildResult: null effort and line are preserved as null', () => {
   const result = buildResult({
     projectKey,
     severity: 'high',
-    rawVulns: [{ severity: 'MAJOR', rule: 'r', component: `${projectKey}:f.ts`, message: 'm' }],
+    categories: defaultCategories,
+    rawIssues: [{ type: 'VULNERABILITY', severity: 'MAJOR', rule: 'r', component: `${projectKey}:f.ts`, message: 'm' }],
     rawHotspots: [],
     probFilter: HOTSPOT_PROB_FILTER.high,
   });
 
-  assert.equal(result.vulnerabilities[0].line, null);
-  assert.equal(result.vulnerabilities[0].effort, null);
+  assert.equal(result.issues[0].line, null);
+  assert.equal(result.issues[0].effort, null);
+});
+
+test('buildResult: includes categories in output', () => {
+  const result = buildResult({
+    projectKey, severity: 'high', categories: ['vulnerability', 'bug'],
+    rawIssues: [], rawHotspots: [], probFilter: HOTSPOT_PROB_FILTER.high,
+  });
+  assert.deepEqual(result.categories, ['vulnerability', 'bug']);
 });
 
 // ---- HTTP mock helpers ----

@@ -12,6 +12,8 @@ import {
   buildAlert,
   buildResult,
   SEVERITY_LEVELS,
+  CATEGORIES,
+  DEFAULT_CATEGORIES,
   get,
   paginate,
 } from './scan.mjs';
@@ -43,6 +45,20 @@ test('parseArgs: --all sets all flag', () => {
 
 test('parseArgs: all defaults to false', () => {
   assert.equal(parseArgs([]).all, false);
+});
+
+test('parseArgs: categories defaults to DEFAULT_CATEGORIES', () => {
+  assert.deepEqual(parseArgs([]).categories, DEFAULT_CATEGORIES);
+});
+
+test('parseArgs: --categories parses comma-separated list', () => {
+  const r = parseArgs(['--categories', 'vulnerabilities,alerts']);
+  assert.deepEqual(r.categories, ['vulnerabilities', 'alerts']);
+});
+
+test('parseArgs: --categories all expands to full list', () => {
+  const r = parseArgs(['--categories', 'all']);
+  assert.deepEqual(r.categories, CATEGORIES);
 });
 
 // ---- SEVERITY_LEVELS ----
@@ -174,6 +190,17 @@ test('buildRecommendation: uses metadata severity', () => {
   const rec = buildRecommendation(mockAssessment, mockMeta);
   assert.equal(rec.severity, 'High');
   assert.equal(rec.type, 'recommendation');
+});
+
+test('buildRecommendation: includes lowercased categories from metadata', () => {
+  const metaWithCats = { properties: { ...mockMeta.properties, categories: ['Compute', 'Networking'] } };
+  const rec = buildRecommendation(mockAssessment, metaWithCats);
+  assert.deepEqual(rec.categories, ['compute', 'networking']);
+});
+
+test('buildRecommendation: categories is empty array when not in metadata', () => {
+  const rec = buildRecommendation(mockAssessment, mockMeta);
+  assert.deepEqual(rec.categories, []);
 });
 
 // ---- buildAlert ----

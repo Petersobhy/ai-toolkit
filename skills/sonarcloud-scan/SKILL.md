@@ -9,9 +9,12 @@ arguments:
     default: high
   - name: repo
     description: "Repository name to scan (e.g. my-service). Omit to infer from current git directory."
+  - name: categories
+    description: "Comma-separated issue categories to fetch. Options: vulnerability, bug, code_smell, hotspot. Default: vulnerability"
+    default: "vulnerability"
   - name: all
     description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
-argument-hint: "[severity: critical|high|medium|all] [repo-name] [--all]"
+argument-hint: "[severity: critical|high|medium|all] [repo-name] [--categories vulnerability,bug,hotspot] [--all]"
 metadata:
   version: 1.0.0
   setup-hint: "set SONAR_TOKEN, SONAR_ORG env vars"

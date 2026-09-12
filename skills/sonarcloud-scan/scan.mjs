@@ -18,12 +18,31 @@ export const HOTSPOT_PROB_FILTER = {
   all:      ['HIGH', 'MEDIUM', 'LOW'],
 };
 
+// Real SonarCloud issue types from their API
+// vulnerability = confirmed SAST security issues
+// bug           = code correctness issues
+// code_smell    = maintainability issues
+// hotspot       = security hotspots requiring manual review
+export const CATEGORIES = ['vulnerability', 'bug', 'code_smell', 'hotspot'];
+export const DEFAULT_CATEGORIES = ['vulnerability'];
+
+// Map user-facing category names to SonarCloud API type values
+const SONAR_TYPE_MAP = {
+  vulnerability: 'VULNERABILITY',
+  bug:           'BUG',
+  code_smell:    'CODE_SMELL',
+};
+
 export function parseArgs(argv) {
-  const out = { severity: 'high', repo: null, all: false };
+  const out = { severity: 'high', repo: null, all: false, categories: DEFAULT_CATEGORIES };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--severity' && argv[i + 1]) out.severity = argv[++i];
     else if (argv[i] === '--repo' && argv[i + 1]) out.repo = argv[++i];
     else if (argv[i] === '--all') out.all = true;
+    else if (argv[i] === '--categories' && argv[i + 1]) {
+      const raw = argv[++i];
+      out.categories = raw === 'all' ? CATEGORIES : raw.split(',').map(c => c.trim().toLowerCase());
+    }
   }
   return out;
 }
@@ -32,11 +51,14 @@ export function stripProjectKey(component, projectKey) {
   return component ? component.replace(`${projectKey}:`, '') : component;
 }
 
-export function buildResult({ projectKey, severity, rawVulns, rawHotspots, probFilter }) {
+export function buildResult({ projectKey, severity, categories, rawIssues, rawHotspots, probFilter }) {
+  const filteredHotspots = rawHotspots.filter(h => probFilter.includes(h.vulnerabilityProbability));
   return {
     project: projectKey,
     severity,
-    vulnerabilities: rawVulns.map(i => ({
+    categories,
+    issues: rawIssues.map(i => ({
+      category: (i.type ?? 'VULNERABILITY').toLowerCase(),
       severity: i.severity,
       rule:     i.rule,
       file:     stripProjectKey(i.component, projectKey),
@@ -44,18 +66,16 @@ export function buildResult({ projectKey, severity, rawVulns, rawHotspots, probF
       message:  i.message,
       effort:   i.effort ?? null,
     })),
-    hotspots: rawHotspots
-      .filter(h => probFilter.includes(h.vulnerabilityProbability))
-      .map(h => ({
-        probability: h.vulnerabilityProbability,
-        rule:        h.ruleKey,
-        file:        stripProjectKey(h.component, projectKey),
-        line:        h.line ?? null,
-        message:     h.message,
-      })),
+    hotspots: filteredHotspots.map(h => ({
+      probability: h.vulnerabilityProbability,
+      rule:        h.ruleKey,
+      file:        stripProjectKey(h.component, projectKey),
+      line:        h.line ?? null,
+      message:     h.message,
+    })),
     summary: {
-      total_vulnerabilities: rawVulns.length,
-      total_hotspots:        rawHotspots.filter(h => probFilter.includes(h.vulnerabilityProbability)).length,
+      total_issues:   rawIssues.length,
+      total_hotspots: filteredHotspots.length,
     },
   };
 }
@@ -96,7 +116,7 @@ export async function paginate(buildUrl, token, key, maxPages = 1) {
 }
 
 async function main() {
-  const { severity, repo, all } = parseArgs(process.argv.slice(2));
+  const { severity, repo, all, categories } = parseArgs(process.argv.slice(2));
   const token = process.env.SONAR_TOKEN;
   const org   = process.env.SONAR_ORG;
 
@@ -120,18 +140,27 @@ async function main() {
   const sonarSeverities = SEVERITY_FILTER[severity] ?? SEVERITY_FILTER.high;
   const probFilter      = HOTSPOT_PROB_FILTER[severity] ?? HOTSPOT_PROB_FILTER.high;
 
-  const vulnBase = `${BASE}/issues/search?componentKeys=${encodeURIComponent(projectKey)}&types=VULNERABILITY&statuses=OPEN,CONFIRMED,REOPENED&severities=${sonarSeverities}&organization=${encodeURIComponent(org)}`;
-  const rawVulns = await paginate(p => `${vulnBase}&p=${p}&ps=100`, token, 'issues', maxPages);
+  // Map requested categories to SonarCloud types — fetch only what was asked for
+  const wantHotspots = categories.includes('hotspot');
+  const issueTypes = categories.filter(c => SONAR_TYPE_MAP[c]).map(c => SONAR_TYPE_MAP[c]);
 
-  let rawHotspots = [];
-  try {
-    const hotspotBase = `${BASE}/hotspots/search?projectKey=${encodeURIComponent(projectKey)}&status=TO_REVIEW`;
-    rawHotspots = await paginate(p => `${hotspotBase}&p=${p}&ps=100`, token, 'hotspots', maxPages);
-  } catch {
-    // hotspots endpoint may be unavailable on free plans — skip silently
+  let rawIssues = [];
+  if (issueTypes.length > 0) {
+    const issueBase = `${BASE}/issues/search?componentKeys=${encodeURIComponent(projectKey)}&types=${issueTypes.join(',')}&statuses=OPEN,CONFIRMED,REOPENED&severities=${sonarSeverities}&organization=${encodeURIComponent(org)}`;
+    rawIssues = await paginate(p => `${issueBase}&p=${p}&ps=100`, token, 'issues', maxPages);
   }
 
-  console.log(JSON.stringify(buildResult({ projectKey, severity, rawVulns, rawHotspots, probFilter }), null, 2));
+  let rawHotspots = [];
+  if (wantHotspots) {
+    try {
+      const hotspotBase = `${BASE}/hotspots/search?projectKey=${encodeURIComponent(projectKey)}&status=TO_REVIEW`;
+      rawHotspots = await paginate(p => `${hotspotBase}&p=${p}&ps=100`, token, 'hotspots', maxPages);
+    } catch {
+      // hotspots endpoint may be unavailable on free plans — skip silently
+    }
+  }
+
+  console.log(JSON.stringify(buildResult({ projectKey, severity, categories, rawIssues, rawHotspots, probFilter }), null, 2));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
