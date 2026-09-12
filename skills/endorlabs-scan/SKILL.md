@@ -123,19 +123,25 @@ get_resource(
 )
 ```
 
-### 3. Triage — filter by severity and summarize
+### 3. Triage — filter, deduplicate, and summarize
 
 Apply the severity filter from Step 0. Group findings: **Critical → High → Medium → Low** (stop at the requested minimum severity).
 
-For each finding at or above the requested severity, capture:
-- Category (from `spec.finding_categories` — e.g. SCA, Secrets, Security)
-- Package name + version (`spec.target_dependency_package_name`, `spec.target_dependency_version`)
-- CVE ID if applicable (call `get_endor_vulnerability` for full details if needed)
-- Whether a fix version exists (`spec.remediation`)
-- Reachability from `spec.finding_tags`: `FINDING_TAGS_REACHABLE_FUNCTION` = reachable, `FINDING_TAGS_POTENTIALLY_REACHABLE_FUNCTION` = potentially reachable
-- Fix available: `FINDING_TAGS_FIX_AVAILABLE` in tags
+**Endor Labs returns one Finding per dependency path — deduplicate before rendering.**
+Group by `(spec.target_dependency_package_name, spec.target_dependency_version)`. For each group:
+- Take the highest reachability across all paths: `reachable > potentially reachable > not reachable`
+- Take `fix_available = true` if any path has `FINDING_TAGS_FIX_AVAILABLE`
+- Take remediation from the first finding in the group
+- Emit one row per unique package, not one per path
 
-Skip findings below the requested severity entirely — do not mention them unless the user asks.
+For each deduplicated finding capture:
+- Category (from `spec.finding_categories`)
+- Package name + version (`spec.target_dependency_package_name`, `spec.target_dependency_version`)
+- Reachability from `spec.finding_tags`: `FINDING_TAGS_REACHABLE_FUNCTION` = Yes, `FINDING_TAGS_POTENTIALLY_REACHABLE_FUNCTION` = Maybe, neither = No
+- Fix available: `FINDING_TAGS_FIX_AVAILABLE` in tags
+- Remediation from `spec.remediation`
+
+Skip findings below the requested severity entirely.
 
 ### 4. Report findings
 
