@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const REPO = 'peter-at-integrant/ai-toolkit';
+const REPO = 'Petersobhy/ai-toolkit';
 const BRANCH = 'main';
 const SKILLS_PATH = 'skills';
 const INSTALL_DIR = path.join(os.homedir(), '.claude', 'agents');
