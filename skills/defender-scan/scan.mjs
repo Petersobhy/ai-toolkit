@@ -134,7 +134,8 @@ function getToken() {
     'account', 'get-access-token',
     '--resource', 'https://management.azure.com/',
     '--query', 'accessToken', '-o', 'tsv',
-  ], { encoding: 'utf8' });
+  ], { encoding: 'utf8', timeout: 10000 });
+  if (r.error?.code === 'ETIMEDOUT') throw new Error('Azure token request timed out — run `az login` to refresh your session.');
   if (r.status !== 0) throw new Error('Failed to get Azure token — run `az login` first.\n' + r.stderr);
   return r.stdout.trim();
 }
