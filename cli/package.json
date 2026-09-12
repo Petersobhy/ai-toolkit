@@ -1,5 +1,5 @@
 {
-  "name": "@integrant/ai-toolkit",
+  "name": "@petersobhy/ai-toolkit",
   "version": "1.0.0",
   "description": "Install and manage Integrant squad AI skills for Claude Code",
   "bin": {
