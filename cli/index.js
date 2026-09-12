@@ -29,6 +29,11 @@ function get(url) {
   });
 }
 
+function parseVersion(content) {
+  const match = content.match(/^---[\s\S]*?^version:\s*(.+?)$/m);
+  return match ? match[1].trim() : null;
+}
+
 async function listAvailable() {
   const data = JSON.parse(await get(`${API_BASE}/${SKILLS_PATH}`));
   return data
@@ -85,11 +90,15 @@ async function cmdUpdate() {
 }
 
 async function cmdList() {
-  const [available, installed] = await Promise.all([listAvailable(), Promise.resolve(listInstalled())]);
+  const available = await listAvailable();
+  const installed = listInstalled();
   console.log('Available skills:\n');
   for (const name of available) {
-    const tag = installed.includes(name) ? ' (installed)' : '';
-    console.log(`  ${name}${tag}`);
+    const content = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}.md`);
+    const version = parseVersion(content);
+    const versionTag = version ? ` v${version}` : '';
+    const installedTag = installed.includes(name) ? ' (installed)' : '';
+    console.log(`  ${name}${versionTag}${installedTag}`);
   }
 }
 

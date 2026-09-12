@@ -1,5 +1,6 @@
 ---
 name: endorlabs-scan
+version: 1.0.0
 description: "Run Endorlabs security investigations using the endor-cli-tools MCP. Use when asked to: scan a repo for vulnerabilities, check a dependency for CVEs, investigate security risks, look up a CVE in Endorlabs, run a security review on code changes, or audit open source dependencies. Trigger words: 'endorlabs', 'endor scan', 'scan for vulnerabilities', 'check dependencies', 'CVE lookup', 'security scan', 'dependency risks'."
 ---
 
