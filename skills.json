@@ -1,0 +1,14 @@
+{
+  "defender-scan": {
+    "version": "1.0.0",
+    "updated": "2026-09-12"
+  },
+  "endorlabs-scan": {
+    "version": "1.2.0",
+    "updated": "2026-09-12"
+  },
+  "sonarcloud-scan": {
+    "version": "1.0.0",
+    "updated": "2026-09-12"
+  }
+}

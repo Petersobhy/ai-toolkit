@@ -23,6 +23,16 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Generate skills manifest
+        run: node scripts/generate-manifest.js
+
+      - name: Commit skills.json if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add skills.json
+          git diff --cached --quiet || git commit -m "chore: update skills.json manifest [skip ci]"
+
       - name: Install semantic-release
         run: npm install -g semantic-release @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/npm @semantic-release/github
 

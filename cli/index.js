@@ -122,16 +122,24 @@ async function cmdUpdate() {
   console.log('\nRestart Claude Code to activate updated skills.');
 }
 
+async function fetchManifest() {
+  try {
+    return JSON.parse(await get(`${RAW_BASE}/skills.json`));
+  } catch {
+    return {};
+  }
+}
+
 async function cmdList() {
-  const available = await listAvailable();
-  const installed = listInstalled();
+  const [manifest, installed] = await Promise.all([fetchManifest(), listInstalled()]);
+  const names = Object.keys(manifest).sort();
+  if (names.length === 0) {
+    console.log('No skills found.');
+    return;
+  }
   console.log('Available skills:\n');
-  for (const name of available) {
-    let version = null;
-    try {
-      const content = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/SKILL.md`);
-      version = parseVersion(content);
-    } catch { /* skip if fetch fails */ }
+  for (const name of names) {
+    const version      = manifest[name]?.version;
     const versionTag   = version ? ` v${version}` : '';
     const installedTag = installed.includes(name) ? ' (installed)' : '';
     console.log(`  ${name}${versionTag}${installedTag}`);
