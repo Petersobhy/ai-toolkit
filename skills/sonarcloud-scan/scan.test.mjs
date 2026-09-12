@@ -1,6 +1,8 @@
 // Uses Node built-in test runner (node:test) — no external dependencies
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import https from 'https';
+import { EventEmitter } from 'events';
 
 import {
   parseArgs,
@@ -8,6 +10,8 @@ import {
   buildResult,
   SEVERITY_FILTER,
   HOTSPOT_PROB_FILTER,
+  get,
+  paginate,
 } from './scan.mjs';
 
 // --- parseArgs ---
@@ -128,4 +132,127 @@ test('buildResult: null effort and line are preserved as null', () => {
 
   assert.equal(result.vulnerabilities[0].line, null);
   assert.equal(result.vulnerabilities[0].effort, null);
+});
+
+// ---- HTTP mock helpers ----
+
+function fakeReq(onTimeout) {
+  const req = new EventEmitter();
+  req.destroy = (err) => { if (err) req.emit('error', err); };
+  req.setTimeout = (ms, cb) => { if (onTimeout) onTimeout(cb); return req; };
+  return req;
+}
+
+function fakeRes(statusCode, body) {
+  const res = new EventEmitter();
+  res.statusCode = statusCode;
+  setImmediate(() => {
+    res.emit('data', typeof body === 'string' ? body : JSON.stringify(body));
+    res.emit('end');
+  });
+  return res;
+}
+
+function mockHttpGet(statusCode, body, { triggerTimeout = false } = {}) {
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq(triggerTimeout ? (timeoutCb) => setImmediate(timeoutCb) : null);
+    if (!triggerTimeout) setImmediate(() => cb(fakeRes(statusCode, body)));
+    return req;
+  });
+}
+
+// ---- get() ----
+
+test('get: resolves with parsed JSON on 200', async () => {
+  mockHttpGet(200, { issues: [], paging: { total: 0 } });
+  const result = await get('https://sonarcloud.io/api/issues/search', 'tok');
+  assert.deepEqual(result, { issues: [], paging: { total: 0 } });
+  mock.restoreAll();
+});
+
+test('get: rejects with not_found code on 404', async () => {
+  mockHttpGet(404, 'Not Found');
+  await assert.rejects(
+    () => get('https://sonarcloud.io/api/components/show?component=org:repo', 'tok'),
+    (err) => { assert.equal(err.code, 'not_found'); return true; }
+  );
+  mock.restoreAll();
+});
+
+test('get: rejects with HTTP error on non-200/non-404', async () => {
+  mockHttpGet(401, 'Unauthorized');
+  await assert.rejects(
+    () => get('https://sonarcloud.io/api/issues/search', 'bad-token'),
+    /HTTP 401/
+  );
+  mock.restoreAll();
+});
+
+test('get: rejects with timeout error when request hangs', async () => {
+  mockHttpGet(200, {}, { triggerTimeout: true });
+  await assert.rejects(
+    () => get('https://sonarcloud.io/api/issues/search', 'tok', 100),
+    /timed out/i
+  );
+  mock.restoreAll();
+});
+
+test('get: rejects on invalid JSON', async () => {
+  mockHttpGet(200, '<html>error page</html>');
+  await assert.rejects(
+    () => get('https://sonarcloud.io/api/issues/search', 'tok'),
+    /Bad JSON/
+  );
+  mock.restoreAll();
+});
+
+// ---- paginate() ----
+
+test('paginate: collects all items from a single page', async () => {
+  mockHttpGet(200, { issues: [{ severity: 'CRITICAL' }, { severity: 'MAJOR' }], paging: { total: 2 } });
+  const items = await paginate(() => 'https://sonarcloud.io/api/issues/search', 'tok', 'issues');
+  assert.equal(items.length, 2);
+  mock.restoreAll();
+});
+
+test('paginate: follows page numbers across two pages', async () => {
+  let call = 0;
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq();
+    const bodies = [
+      { issues: [{ severity: 'CRITICAL' }], paging: { total: 3 } },
+      { issues: [{ severity: 'MAJOR' }, { severity: 'MAJOR' }], paging: { total: 3 } },
+    ];
+    setImmediate(() => cb(fakeRes(200, bodies[call++])));
+    return req;
+  });
+  const items = await paginate((p) => `https://sonarcloud.io/api/issues/search?p=${p}&ps=100`, 'tok', 'issues');
+  assert.equal(items.length, 3);
+  assert.equal(call, 2);
+  mock.restoreAll();
+});
+
+test('paginate: returns empty array when key is absent', async () => {
+  mockHttpGet(200, { paging: { total: 0 } });
+  const items = await paginate(() => 'https://sonarcloud.io/api/issues/search', 'tok', 'issues');
+  assert.deepEqual(items, []);
+  mock.restoreAll();
+});
+
+test('paginate: stops when batch is empty before reaching total', async () => {
+  let call = 0;
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq();
+    // total says 5 but second page returns empty — should stop
+    const bodies = [
+      { issues: [{ severity: 'MAJOR' }], paging: { total: 5 } },
+      { issues: [], paging: { total: 5 } },
+    ];
+    setImmediate(() => cb(fakeRes(200, bodies[call++])));
+    return req;
+  });
+  const items = await paginate((p) => `https://sonarcloud.io/api/issues/search?p=${p}&ps=100`, 'tok', 'issues');
+  assert.equal(items.length, 1);
+  assert.equal(call, 2);
+  mock.restoreAll();
 });

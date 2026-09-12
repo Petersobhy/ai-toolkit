@@ -127,7 +127,7 @@ export function buildResult({ subscription, severity, secureScore, vulnerabiliti
   };
 }
 
-// ---- HTTP + auth (not exported — requires az CLI) ----
+// ---- HTTP + auth ----
 
 function getToken() {
   const r = spawnSync('az', [
@@ -140,23 +140,27 @@ function getToken() {
   return r.stdout.trim();
 }
 
-function get(url, token) {
+export function get(url, token, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
-    https.get(url, {
+    const req = https.get(url, {
       headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'ai-toolkit/defender-scan' },
     }, (res) => {
       let raw = '';
       res.on('data', c => (raw += c));
       res.on('end', () => {
+        req.destroy();
         if (res.statusCode === 404) { reject(Object.assign(new Error('not_found'), { code: 'not_found' })); return; }
         if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 300)}`)); return; }
         try { resolve(JSON.parse(raw)); } catch { reject(new Error(`Bad JSON from ${url}`)); }
       });
     }).on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Request timed out after ${timeoutMs / 1000}s: ${url.slice(0, 120)}`));
+    });
   });
 }
 
-async function paginate(baseUrl, token) {
+export async function paginate(baseUrl, token) {
   const items = [];
   let url = baseUrl;
   while (url) {

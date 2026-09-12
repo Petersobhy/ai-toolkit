@@ -1,5 +1,7 @@
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import https from 'https';
+import { EventEmitter } from 'events';
 
 import {
   parseArgs,
@@ -10,6 +12,8 @@ import {
   buildAlert,
   buildResult,
   SEVERITY_LEVELS,
+  get,
+  paginate,
 } from './scan.mjs';
 
 // ---- parseArgs ----
@@ -209,4 +213,109 @@ test('buildResult: summary counts match arrays', () => {
   assert.equal(result.summary.total_vulnerabilities, 1);
   assert.equal(result.summary.total_recommendations, 1);
   assert.equal(result.summary.total_alerts, 1);
+});
+
+// ---- HTTP mock helpers ----
+
+function fakeReq(onTimeout) {
+  const req = new EventEmitter();
+  req.destroy = (err) => { if (err) req.emit('error', err); };
+  req.setTimeout = (ms, cb) => { if (onTimeout) onTimeout(cb); return req; };
+  return req;
+}
+
+function fakeRes(statusCode, body) {
+  const res = new EventEmitter();
+  res.statusCode = statusCode;
+  setImmediate(() => {
+    res.emit('data', typeof body === 'string' ? body : JSON.stringify(body));
+    res.emit('end');
+  });
+  return res;
+}
+
+function mockHttpGet(statusCode, body, { triggerTimeout = false } = {}) {
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq(triggerTimeout ? (timeoutCb) => setImmediate(timeoutCb) : null);
+    if (!triggerTimeout) setImmediate(() => cb(fakeRes(statusCode, body)));
+    return req;
+  });
+}
+
+// ---- get() ----
+
+test('get: resolves with parsed JSON on 200', async () => {
+  mockHttpGet(200, { value: [1, 2], nextLink: null });
+  const result = await get('https://example.com/api', 'tok');
+  assert.deepEqual(result, { value: [1, 2], nextLink: null });
+  mock.restoreAll();
+});
+
+test('get: rejects with not_found code on 404', async () => {
+  mockHttpGet(404, 'Not Found');
+  await assert.rejects(
+    () => get('https://example.com/api', 'tok'),
+    (err) => { assert.equal(err.code, 'not_found'); return true; }
+  );
+  mock.restoreAll();
+});
+
+test('get: rejects with HTTP error on non-200/non-404', async () => {
+  mockHttpGet(500, 'Internal Server Error');
+  await assert.rejects(
+    () => get('https://example.com/api', 'tok'),
+    /HTTP 500/
+  );
+  mock.restoreAll();
+});
+
+test('get: rejects with timeout error when request hangs', async () => {
+  mockHttpGet(200, {}, { triggerTimeout: true });
+  await assert.rejects(
+    () => get('https://example.com/api', 'tok', 100),
+    /timed out/i
+  );
+  mock.restoreAll();
+});
+
+test('get: rejects on invalid JSON', async () => {
+  mockHttpGet(200, 'not-json-at-all{{');
+  await assert.rejects(
+    () => get('https://example.com/api', 'tok'),
+    /Bad JSON/
+  );
+  mock.restoreAll();
+});
+
+// ---- paginate() ----
+
+test('paginate: collects all items from a single page', async () => {
+  mockHttpGet(200, { value: [{ id: 'a' }, { id: 'b' }], nextLink: null });
+  const items = await paginate('https://example.com/api', 'tok');
+  assert.equal(items.length, 2);
+  mock.restoreAll();
+});
+
+test('paginate: follows nextLink across two pages', async () => {
+  let call = 0;
+  mock.method(https, 'get', (_url, _opts, cb) => {
+    const req = fakeReq();
+    const bodies = [
+      { value: [{ id: 'a' }], nextLink: 'https://example.com/api?page=2' },
+      { value: [{ id: 'b' }, { id: 'c' }], nextLink: null },
+    ];
+    setImmediate(() => cb(fakeRes(200, bodies[call++])));
+    return req;
+  });
+  const items = await paginate('https://example.com/api', 'tok');
+  assert.equal(items.length, 3);
+  assert.equal(call, 2);
+  mock.restoreAll();
+});
+
+test('paginate: returns empty array when value is absent', async () => {
+  mockHttpGet(200, {});
+  const items = await paginate('https://example.com/api', 'tok');
+  assert.deepEqual(items, []);
+  mock.restoreAll();
 });
