@@ -14,6 +14,8 @@ Built incrementally alongside the team's AI upskilling journey — each addition
 
 ## Installing a skill
 
+### Manual (now)
+
 Copy the skill file into your global Claude Code agents directory:
 
 ```bash
@@ -21,6 +23,18 @@ cp skills/<skill-name>.md ~/.claude/agents/<skill-name>.md
 ```
 
 Restart Claude Code. The skill is now available in any session.
+
+### CLI installer (planned)
+
+A thin CLI will replace the manual step:
+
+```bash
+npx @integrant/ai-toolkit add endorlabs-scan
+npx @integrant/ai-toolkit add --all
+npx @integrant/ai-toolkit update
+```
+
+The installer fetches skill files from this repo and writes them to `~/.claude/agents/` — no skill file ever lands in a client repo. Published to a private npm registry (GitHub Packages).
 
 ## Contributing a skill
 
