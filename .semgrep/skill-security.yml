@@ -1,0 +1,49 @@
+rules:
+  - id: skill-sensitive-claude-path
+    patterns:
+      - pattern-regex: '~\/\.claude\/(?!agents\/)'
+    message: >
+      ~/.claude/ path detected (not agents/ subdir). Only ~/.claude/agents/<name>.md
+      is the valid install target. Use ~/.ai-toolkit/ for companion scripts.
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/skills/*/SKILL.md"
+
+  # Only flag node/script execution commands — not manual az/git setup steps
+  - id: skill-unquoted-shell-arg-in-command
+    patterns:
+      - pattern-regex: '(?m)^(node|python3?|bash|sh|npx)\s.*--\w[\w-]*\s+<\w[\w-]*>'
+    message: >
+      Unquoted user-controlled argument in shell command. Wrap in single quotes:
+      --flag '<value>' and add input validation in Step 0.
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/skills/*/SKILL.md"
+
+  - id: skill-leaked-private-path
+    patterns:
+      - pattern-regex: '~\/\.claude\/(skills|memory|projects|agents\/scripts)\/'
+    message: >
+      Private local path leaked. ~/.claude/skills/ and ~/.claude/memory/ are personal
+      machine paths that must never appear in a public skill file.
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/skills/*/SKILL.md"
+
+  - id: skill-sensitive-credential-path
+    patterns:
+      - pattern-regex: '~\/\.(ssh|aws\/credentials|gnupg|netrc|npmrc|pypirc|docker\/config\.json|kube\/config|config\/gcloud\/credentials)'
+    message: >
+      Sensitive credential file referenced. Remove unless the skill explicitly declares
+      credential file access as its stated purpose.
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/skills/*/SKILL.md"
