@@ -12,6 +12,7 @@ arguments:
 argument-hint: "[severity: critical|high|medium|all] [repo-name]"
 metadata:
   version: 1.2.0
+  setup-hint: "set ENDOR_NAMESPACE, ENDOR_ORG env vars + connect endor-cli-tools MCP"
 ---
 
 # Endorlabs Security Scan

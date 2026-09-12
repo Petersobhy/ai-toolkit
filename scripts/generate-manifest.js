@@ -14,6 +14,11 @@ function parseVersion(content) {
   return top ? top[1].trim() : null;
 }
 
+function parseSetupHint(content) {
+  const m = content.match(/^[ \t]+setup-hint:\s*"?(.+?)"?\s*$/m);
+  return m ? m[1].trim() : null;
+}
+
 const today = new Date().toISOString().slice(0, 10);
 const manifest = {};
 
@@ -21,8 +26,10 @@ for (const entry of fs.readdirSync(SKILLS_DIR, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   const skillFile = path.join(SKILLS_DIR, entry.name, 'SKILL.md');
   if (!fs.existsSync(skillFile)) continue;
-  const version = parseVersion(fs.readFileSync(skillFile, 'utf8'));
-  manifest[entry.name] = { version: version ?? '0.0.0', updated: today };
+  const content = fs.readFileSync(skillFile, 'utf8');
+  const version   = parseVersion(content);
+  const setupHint = parseSetupHint(content);
+  manifest[entry.name] = { version: version ?? '0.0.0', updated: today, ...(setupHint && { setupHint }) };
 }
 
 fs.writeFileSync(OUT_FILE, JSON.stringify(manifest, null, 2) + '\n');

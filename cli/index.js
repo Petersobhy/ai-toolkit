@@ -100,6 +100,16 @@ async function installSkill(name) {
   return true;
 }
 
+function printSetupHints(names, manifest) {
+  const hints = names.map(n => [n, manifest[n]?.setupHint]).filter(([, h]) => h);
+  if (hints.length === 0) return;
+  const pad = Math.max(...hints.map(([n]) => n.length));
+  console.log('\nSetup required:');
+  for (const [name, hint] of hints) {
+    console.log(`  ${name.padEnd(pad)}  → ${hint}`);
+  }
+}
+
 async function cmdAdd(args) {
   const all = args.includes('--all');
   const names = all ? await listAvailable() : args.filter(a => !a.startsWith('-'));
@@ -110,8 +120,10 @@ async function cmdAdd(args) {
     process.exit(1);
   }
 
+  const manifest = await fetchManifest();
   console.log(all ? `Installing all ${names.length} skills...\n` : `Installing ${names.length} skill(s)...\n`);
   for (const name of names) await installSkill(name);
+  printSetupHints(names, manifest);
   console.log('\nRestart Claude Code to activate installed skills.');
 }
 
@@ -121,8 +133,10 @@ async function cmdUpdate() {
     console.log('No skills installed. Run: ai-toolkit add --all');
     return;
   }
+  const manifest = await fetchManifest();
   console.log(`Updating ${installed.length} installed skill(s)...\n`);
   for (const name of installed) await installSkill(name);
+  printSetupHints(installed, manifest);
   console.log('\nRestart Claude Code to activate updated skills.');
 }
 

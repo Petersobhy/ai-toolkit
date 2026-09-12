@@ -12,6 +12,7 @@ arguments:
 argument-hint: "[severity: critical|high|medium|all] [--resource-group <rg-name>]"
 metadata:
   version: 1.0.0
+  setup-hint: "set AZURE_SUBSCRIPTION_ID env var + run: az login"
 ---
 
 # Microsoft Defender for Cloud Scan

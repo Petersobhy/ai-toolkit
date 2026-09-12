@@ -12,6 +12,7 @@ arguments:
 argument-hint: "[severity: critical|high|medium|all] [repo-name]"
 metadata:
   version: 1.0.0
+  setup-hint: "set SONAR_TOKEN, SONAR_ORG env vars"
 ---
 
 # SonarCloud Security Scan

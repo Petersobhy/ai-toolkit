@@ -1,14 +1,17 @@
 {
   "defender-scan": {
     "version": "1.0.0",
-    "updated": "2026-09-12"
+    "updated": "2026-09-12",
+    "setupHint": "set AZURE_SUBSCRIPTION_ID env var + run: az login"
   },
   "endorlabs-scan": {
     "version": "1.2.0",
-    "updated": "2026-09-12"
+    "updated": "2026-09-12",
+    "setupHint": "set ENDOR_NAMESPACE, ENDOR_ORG env vars + connect endor-cli-tools MCP"
   },
   "sonarcloud-scan": {
     "version": "1.0.0",
-    "updated": "2026-09-12"
+    "updated": "2026-09-12",
+    "setupHint": "set SONAR_TOKEN, SONAR_ORG env vars"
   }
 }
