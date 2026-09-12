@@ -7,13 +7,22 @@ Claude Code skill files. Each file is a self-contained procedure that Claude fol
 ```markdown
 ---
 name: skill-name
-description: "One-line description. Include trigger words so Claude knows when to use it."
+description: "Short description with trigger words (max 1,536 chars combined with when_to_use)."
+when_to_use: "Detailed guidance on when Claude should invoke this skill."
+allowed-tools: Bash Read Grep mcp__your-server__tool_name
+metadata:
+  version: 1.0.0
 ---
 
 # Skill Title
 
 Steps Claude follows...
 ```
+
+Key fields:
+- `description` + `when_to_use` — combined max 1,536 chars; put trigger words in `description`, detail in `when_to_use`
+- `allowed-tools` — pre-approves tools without per-use prompts; use `mcp__<server>__<tool>` format for MCP tools
+- `metadata.version` — skill version (not an official frontmatter field; stored under `metadata`)
 
 ## Rules for contributed skills
 

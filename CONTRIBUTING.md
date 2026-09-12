@@ -34,8 +34,11 @@ Skill frontmatter structure:
 ```yaml
 ---
 name: skill-name
-version: 1.0.0
-description: "One-line description. Include trigger words."
+description: "Short description with trigger words (max 1,536 chars combined with when_to_use)."
+when_to_use: "Detailed guidance on when Claude should invoke this skill."
+allowed-tools: Bash Read mcp__your-server__tool_name
+metadata:
+  version: 1.0.0
 ---
 ```
 
