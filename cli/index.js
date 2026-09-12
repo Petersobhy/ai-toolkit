@@ -79,9 +79,8 @@ async function installSkill(name) {
   const skillContent = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/SKILL.md`);
   fs.mkdirSync(INSTALL_DIR, { recursive: true });
   fs.writeFileSync(path.join(INSTALL_DIR, `${name}.md`), skillContent);
-  console.log(`  ✓ ${name}.md → ${INSTALL_DIR}`);
 
-  // Install companion scripts → ~/.claude/agents/scripts/<name>/
+  // Install companion scripts → ~/.ai-toolkit/scripts/<name>/
   const scripts = entries.filter(e =>
     e.type === 'file' &&
     e.name !== 'SKILL.md' &&
@@ -94,10 +93,10 @@ async function installSkill(name) {
     for (const script of scripts) {
       const content = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/${script.name}`);
       fs.writeFileSync(path.join(scriptDir, script.name), content);
-      console.log(`  ✓ ${script.name} → ${scriptDir}`);
     }
   }
 
+  console.log(`  ✓ ${name}`);
   return true;
 }
 
