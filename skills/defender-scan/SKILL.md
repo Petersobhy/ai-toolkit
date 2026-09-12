@@ -1,7 +1,7 @@
 ---
 name: defender-scan
 description: "Run Microsoft Defender for Cloud security investigations using the Azure Security Center REST API. Trigger words: 'defender', 'defender for cloud', 'azure security', 'cloud posture', 'security recommendations', 'azure vulnerabilities', 'secure score'."
-when_to_use: "Use when asked to: check Azure cloud posture, surface Defender for Cloud recommendations, list active security alerts, review the secure score, or find container/VM/ACR vulnerabilities reported by Defender. Accepts optional arguments: severity (critical|high|medium|all, default: high) and resource-group to limit scope."
+when_to_use: "Use when asked to: check Azure cloud posture, surface Defender for Cloud recommendations, list active security alerts, review the secure score, or find container/VM/ACR vulnerabilities reported by Defender. Accepts optional arguments: severity (critical|high|medium|all, default: critical) and resource-group to limit scope."
 allowed-tools: Bash
 arguments:
   - name: severity
