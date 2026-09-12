@@ -1,0 +1,19 @@
+{
+  "name": "@integrant/ai-toolkit",
+  "version": "1.0.0",
+  "description": "Install and manage Integrant squad AI skills for Claude Code",
+  "bin": {
+    "ai-toolkit": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peter-at-integrant/ai-toolkit.git"
+  }
+}

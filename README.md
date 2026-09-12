@@ -10,7 +10,7 @@ Built incrementally alongside the team's AI upskilling journey — each addition
 |---|---|
 | `skills/` | Claude Code skill files — reusable AI-assisted procedures |
 | `workflows/` | Documented AI-assisted workflows (coming soon) |
-| `cli/` | Skill installer CLI (coming soon) |
+| `cli/` | Skill installer CLI — `npx @integrant/ai-toolkit` |
 
 ## Installing a skill
 
@@ -24,17 +24,16 @@ cp skills/<skill-name>.md ~/.claude/agents/<skill-name>.md
 
 Restart Claude Code. The skill is now available in any session.
 
-### CLI installer (planned)
-
-A thin CLI will replace the manual step:
+### CLI (recommended)
 
 ```bash
-npx @integrant/ai-toolkit add endorlabs-scan
-npx @integrant/ai-toolkit add --all
-npx @integrant/ai-toolkit update
+npx @integrant/ai-toolkit list                  # see available skills
+npx @integrant/ai-toolkit add endorlabs-scan    # install one skill
+npx @integrant/ai-toolkit add --all             # install all skills
+npx @integrant/ai-toolkit update                # update installed skills
 ```
 
-The installer fetches skill files from this repo and writes them to `~/.claude/agents/` — no skill file ever lands in a client repo. Published to a private npm registry (GitHub Packages).
+Fetches skill files from this repo and writes them to `~/.claude/agents/` — no skill file ever lands in a client repo. Requires Node 18+. No additional dependencies.
 
 ## Contributing a skill
 
