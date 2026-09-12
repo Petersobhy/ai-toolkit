@@ -9,6 +9,7 @@ const REPO = 'Petersobhy/ai-toolkit';
 const BRANCH = 'main';
 const SKILLS_PATH = 'skills';
 const INSTALL_DIR = path.join(os.homedir(), '.claude', 'agents');
+const SCRIPTS_DIR = path.join(INSTALL_DIR, 'scripts');
 
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
 const API_BASE = `https://api.github.com/repos/${REPO}/contents`;
@@ -30,15 +31,20 @@ function get(url) {
 }
 
 function parseVersion(content) {
-  const match = content.match(/^---[\s\S]*?^version:\s*(.+?)$/m);
-  return match ? match[1].trim() : null;
+  // metadata.version: 1.0.0 (nested under metadata:)
+  const nested = content.match(/^metadata:\s*\n(?:[ \t]+\S[^\n]*\n)*?[ \t]+version:\s*(.+)$/m);
+  if (nested) return nested[1].trim();
+  // fallback: top-level version: (legacy)
+  const top = content.match(/^version:\s*(.+?)$/m);
+  return top ? top[1].trim() : null;
 }
 
+// List skill folders from GitHub API (directories only, skip README)
 async function listAvailable() {
-  const data = JSON.parse(await get(`${API_BASE}/${SKILLS_PATH}`));
-  return data
-    .filter(f => f.name.endsWith('.md') && f.name !== 'README.md')
-    .map(f => f.name.replace(/\.md$/, ''));
+  const entries = JSON.parse(await get(`${API_BASE}/${SKILLS_PATH}`));
+  return entries
+    .filter(e => e.type === 'dir')
+    .map(e => e.name);
 }
 
 function listInstalled() {
@@ -48,18 +54,45 @@ function listInstalled() {
     .map(f => f.replace(/\.md$/, ''));
 }
 
+// Fetch skill folder contents from GitHub API
+async function getSkillContents(name) {
+  const entries = JSON.parse(await get(`${API_BASE}/${SKILLS_PATH}/${name}`));
+  return entries; // array of { name, type, download_url, ... }
+}
+
 async function installSkill(name) {
-  const url = `${RAW_BASE}/${SKILLS_PATH}/${name}.md`;
-  let content;
+  let entries;
   try {
-    content = await get(url);
+    entries = await getSkillContents(name);
   } catch {
-    console.error(`  ✗ ${name} — not found in repo`);
+    console.error(`  ✗ ${name} — skill folder not found in repo`);
     return false;
   }
+
+  const skillFile = entries.find(e => e.name === 'SKILL.md');
+  if (!skillFile) {
+    console.error(`  ✗ ${name} — missing SKILL.md in skill folder`);
+    return false;
+  }
+
+  // Install SKILL.md → ~/.claude/agents/<name>.md
+  const skillContent = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/SKILL.md`);
   fs.mkdirSync(INSTALL_DIR, { recursive: true });
-  fs.writeFileSync(path.join(INSTALL_DIR, `${name}.md`), content);
-  console.log(`  ✓ ${name} → ${INSTALL_DIR}/${name}.md`);
+  fs.writeFileSync(path.join(INSTALL_DIR, `${name}.md`), skillContent);
+  console.log(`  ✓ ${name}.md → ${INSTALL_DIR}`);
+
+  // Install companion scripts → ~/.claude/agents/scripts/<name>/
+  const scripts = entries.filter(e => e.type === 'file' && e.name !== 'SKILL.md' && e.name !== 'README.md');
+  if (scripts.length > 0) {
+    const scriptDir = path.join(SCRIPTS_DIR, name);
+    fs.mkdirSync(scriptDir, { recursive: true });
+    for (const script of scripts) {
+      const content = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/${script.name}`);
+      fs.writeFileSync(path.join(scriptDir, script.name), content);
+      console.log(`  ✓ ${script.name} → ${scriptDir}`);
+    }
+  }
+
   return true;
 }
 
@@ -94,9 +127,12 @@ async function cmdList() {
   const installed = listInstalled();
   console.log('Available skills:\n');
   for (const name of available) {
-    const content = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}.md`);
-    const version = parseVersion(content);
-    const versionTag = version ? ` v${version}` : '';
+    let version = null;
+    try {
+      const content = await get(`${RAW_BASE}/${SKILLS_PATH}/${name}/SKILL.md`);
+      version = parseVersion(content);
+    } catch { /* skip if fetch fails */ }
+    const versionTag   = version ? ` v${version}` : '';
     const installedTag = installed.includes(name) ? ' (installed)' : '';
     console.log(`  ${name}${versionTag}${installedTag}`);
   }

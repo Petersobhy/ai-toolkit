@@ -23,24 +23,53 @@ ai-toolkit/
 
 ## Adding a new skill
 
+Each skill lives in its own folder under `skills/`:
+
+```
+skills/
+├── my-new-skill/
+│   ├── SKILL.md          # skill definition (required)
+│   ├── scan.mjs          # companion script (if needed)
+│   └── scan.test.mjs     # tests for companion script (required if script exists)
+```
+
+Steps:
+
 1. Write and test the skill locally in `~/.claude/agents/<skill-name>.md`
-2. Add a `version: 1.0.0` field to the YAML frontmatter
-3. Strip all client-specific values — replace with `<YOUR_NAMESPACE>`, `<YOUR_ORG>`, etc.
-4. Copy the file to `skills/<skill-name>.md`
+2. Create `skills/<skill-name>/SKILL.md` — strip all client-specific values, replace with `<YOUR_NAMESPACE>`, `<YOUR_ORG>`, etc.
+3. If the skill needs a companion script, add it alongside `SKILL.md` and write tests in `<name>.test.mjs`
+4. Run tests: `node --test skills/<skill-name>/<name>.test.mjs`
 5. Open a PR with a sample run output in the description
 6. Use a `feat:` commit message — this triggers a minor version bump on merge
 
-Skill frontmatter structure:
+**`SKILL.md` frontmatter structure:**
 ```yaml
 ---
 name: skill-name
 description: "Short description with trigger words (max 1,536 chars combined with when_to_use)."
 when_to_use: "Detailed guidance on when Claude should invoke this skill."
 allowed-tools: Bash Read mcp__your-server__tool_name
+arguments:
+  - name: severity
+    description: "..."
+    default: high
+argument-hint: "[severity: critical|high|medium|all] [repo-name]"
 metadata:
   version: 1.0.0
 ---
 ```
+
+**Companion script conventions:**
+- Use `.mjs` (ESM) with no external npm dependencies — Node built-ins only
+- Export all pure functions so they can be imported by tests
+- Guard the CLI entrypoint: `if (process.argv[1] === fileURLToPath(import.meta.url)) { main()... }`
+- Output structured JSON to stdout; print errors to stderr with a non-zero exit code
+- Installed by the CLI to `~/.claude/agents/scripts/<skill-name>/`
+
+**Test conventions:**
+- Use `node:test` + `node:assert/strict` (no external test runner)
+- Test pure functions: argument parsing, data mapping, filtering, output shape
+- Run with: `node --test skills/<skill-name>/<name>.test.mjs`
 
 ---
 
@@ -84,10 +113,11 @@ Users must update any scripts that call `add`.
 
 ## Updating a skill
 
-1. Edit `skills/<skill-name>.md` locally
-2. Bump the `version:` field in the frontmatter manually (patch or minor)
-3. Commit with `fix:` (bug/correction) or `feat:` (new capability)
-4. Push to main — the CLI package version bumps automatically
+1. Edit `skills/<skill-name>/SKILL.md` (and companion scripts if present)
+2. Bump `metadata.version` in `SKILL.md` frontmatter (patch or minor)
+3. Run tests if a companion script changed: `node --test skills/<skill-name>/<name>.test.mjs`
+4. Commit with `fix:` (bug/correction) or `feat:` (new capability)
+5. Push to main — the CLI package version bumps automatically
 
 ---
 
