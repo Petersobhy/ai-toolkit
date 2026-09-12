@@ -17,7 +17,9 @@ Steps Claude follows...
 
 ## Rules for contributed skills
 
-- **No client-specific values** — replace tenant names, org slugs, namespaces, and endpoints with `<YOUR_NAMESPACE>`, `<YOUR_ORG>`, etc.
+> **This is a public repo.** Every skill file is visible to anyone on the internet. The first rule below is a merge blocker — PRs that contain client-specific values will not be merged.
+
+- **No client-specific values** *(merge blocker)* — replace tenant names, org slugs, namespaces, and endpoints with `<YOUR_NAMESPACE>`, `<YOUR_ORG>`, etc. before opening a PR
 - **Trigger words must be explicit** — list them in the `description` frontmatter field
 - **Include a Prerequisites section** — list any MCP servers, env vars, or tools required
 - **Test before PR** — paste a sample run output in the PR description as evidence
