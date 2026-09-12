@@ -82,7 +82,12 @@ async function installSkill(name) {
   console.log(`  ✓ ${name}.md → ${INSTALL_DIR}`);
 
   // Install companion scripts → ~/.claude/agents/scripts/<name>/
-  const scripts = entries.filter(e => e.type === 'file' && e.name !== 'SKILL.md' && e.name !== 'README.md');
+  const scripts = entries.filter(e =>
+    e.type === 'file' &&
+    e.name !== 'SKILL.md' &&
+    e.name !== 'README.md' &&
+    !e.name.endsWith('.test.mjs')
+  );
   if (scripts.length > 0) {
     const scriptDir = path.join(SCRIPTS_DIR, name);
     fs.mkdirSync(scriptDir, { recursive: true });
