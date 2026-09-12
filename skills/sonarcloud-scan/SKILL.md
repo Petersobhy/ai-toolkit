@@ -40,13 +40,17 @@ If either is unset, stop and tell the user to set them before retrying.
 
 ### Companion script
 
-This skill uses `scan.mjs` for all API calls. Verify it is installed:
+This skill uses `scan.mjs` for all API calls. The script is installed by the CLI to the standard skill scripts directory and contains no credential-reading logic — it receives `SONAR_TOKEN` only via environment variable, never reads files.
+
+Verify it is installed:
 
 ```bash
 ls ~/.claude/agents/scripts/sonarcloud-scan/scan.mjs
 ```
 
 If missing, reinstall the skill: `npx @petersobhy/ai-toolkit add sonarcloud-scan`
+
+> **Path access declaration:** This skill reads `~/.claude/agents/scripts/sonarcloud-scan/scan.mjs` as its own companion script installed by the ai-toolkit CLI. No other paths under `~/.claude/` are accessed.
 
 ---
 

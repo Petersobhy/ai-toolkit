@@ -1,5 +1,7 @@
 # ai-toolkit
 
+[![SkillShield](https://skillshield.io/api/v1/badge/54960b55711e0bbf.svg)](https://skillshield.io/report/54960b55711e0bbf)
+
 A growing library of AI-assisted skills and tooling for the squad — each addition maps to a real use case, not a hypothetical one.
 
 ## What's here

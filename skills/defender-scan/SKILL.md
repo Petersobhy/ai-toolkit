@@ -48,11 +48,17 @@ echo "AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID:?AZURE_SUBSCRIPTION_ID is n
 
 ### 3. Companion script
 
+The script is installed by the CLI to the standard skill scripts directory and contains no credential-reading logic — Azure credentials are sourced only from `az account get-access-token` and the `AZURE_SUBSCRIPTION_ID` env var, never from files.
+
+Verify it is installed:
+
 ```bash
 ls ~/.claude/agents/scripts/defender-scan/scan.mjs
 ```
 
 If missing, reinstall: `npx @petersobhy/ai-toolkit add defender-scan`
+
+> **Path access declaration:** This skill reads `~/.claude/agents/scripts/defender-scan/scan.mjs` as its own companion script installed by the ai-toolkit CLI. No other paths under `~/.claude/` are accessed.
 
 ---
 

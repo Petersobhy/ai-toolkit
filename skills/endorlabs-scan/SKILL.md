@@ -30,11 +30,13 @@ Verify the MCP server is connected:
 ```
 claude mcp list
 ```
-`endor-cli-tools` must show `✓ Connected`. If it shows `✗ Failed`, see the [Endor MCP troubleshooting guide](~/.claude/skills/reference_endor_mcp_troubleshooting.md) or run:
-```bash
-endorctl auth login
-```
-Then restart Claude Code and retry.
+`endor-cli-tools` must show `✓ Connected`. If it shows `✗ Failed`:
+
+1. Run `endorctl auth login` and follow the browser prompt
+2. Verify credentials: `endorctl config get`
+3. Restart Claude Code and retry
+
+If the MCP server still fails to connect, check that `endorctl` is on your PATH and that your Endor Labs API token has the correct scopes (namespace read + findings read).
 
 ### 2. Required environment variables
 
