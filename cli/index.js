@@ -9,7 +9,7 @@ const REPO = 'Petersobhy/ai-toolkit';
 const BRANCH = 'main';
 const SKILLS_PATH = 'skills';
 const INSTALL_DIR = path.join(os.homedir(), '.claude', 'agents');
-const SCRIPTS_DIR = path.join(INSTALL_DIR, 'scripts');
+const SCRIPTS_DIR = path.join(os.homedir(), '.ai-toolkit', 'scripts');
 
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
 const API_BASE = `https://api.github.com/repos/${REPO}/contents`;

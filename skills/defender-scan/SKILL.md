@@ -48,17 +48,15 @@ echo "AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID:?AZURE_SUBSCRIPTION_ID is n
 
 ### 3. Companion script
 
-The script is installed by the CLI to the standard skill scripts directory and contains no credential-reading logic — Azure credentials are sourced only from `az account get-access-token` and the `AZURE_SUBSCRIPTION_ID` env var, never from files.
+The script sources Azure credentials only from `az account get-access-token` and the `AZURE_SUBSCRIPTION_ID` env var — it never reads credential files.
 
 Verify it is installed:
 
 ```bash
-ls ~/.claude/agents/scripts/defender-scan/scan.mjs
+ls ~/.ai-toolkit/scripts/defender-scan/scan.mjs
 ```
 
 If missing, reinstall: `npx @petersobhy/ai-toolkit add defender-scan`
-
-> **Path access declaration:** This skill reads `~/.claude/agents/scripts/defender-scan/scan.mjs` as its own companion script installed by the ai-toolkit CLI. No other paths under `~/.claude/` are accessed.
 
 ---
 
@@ -89,18 +87,18 @@ Defender uses High / Medium / Low / Informational (no "Critical" tier):
 
 ## Steps
 
-### 0. Resolve arguments
+### 0. Resolve and validate arguments
 
-- **severity**: from user request or default `high`
-- **resource-group**: from user request, or omit for full subscription scan
-- **AZURE_SUBSCRIPTION_ID**: from env var — fail clearly if unset
+- **severity**: from user request or default `high`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
+- **resource-group**: from user request, or omit for full subscription scan. If provided, must contain only alphanumeric characters, hyphens, and underscores — reject if it contains shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `\`).
+- **AZURE_SUBSCRIPTION_ID**: from env var — fail clearly if unset.
 
 ### 1. Run the scan script
 
 ```bash
-node ~/.claude/agents/scripts/defender-scan/scan.mjs \
-  --severity <severity> \
-  [--resource-group <rg-name>]
+node ~/.ai-toolkit/scripts/defender-scan/scan.mjs \
+  --severity '<severity>' \
+  [--resource-group '<rg-name>']
 ```
 
 **Exit codes:**

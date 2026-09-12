@@ -40,17 +40,15 @@ If either is unset, stop and tell the user to set them before retrying.
 
 ### Companion script
 
-This skill uses `scan.mjs` for all API calls. The script is installed by the CLI to the standard skill scripts directory and contains no credential-reading logic — it receives `SONAR_TOKEN` only via environment variable, never reads files.
+This skill uses `scan.mjs` for all API calls. It receives `SONAR_TOKEN` only via environment variable — it never reads credential files.
 
 Verify it is installed:
 
 ```bash
-ls ~/.claude/agents/scripts/sonarcloud-scan/scan.mjs
+ls ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs
 ```
 
 If missing, reinstall the skill: `npx @petersobhy/ai-toolkit add sonarcloud-scan`
-
-> **Path access declaration:** This skill reads `~/.claude/agents/scripts/sonarcloud-scan/scan.mjs` as its own companion script installed by the ai-toolkit CLI. No other paths under `~/.claude/` are accessed.
 
 ---
 
@@ -68,18 +66,18 @@ If missing, reinstall the skill: `npx @petersobhy/ai-toolkit add sonarcloud-scan
 
 ## Steps
 
-### 0. Resolve arguments
+### 0. Resolve and validate arguments
 
-- **severity**: from user request or default `high`
-- **repo**: from user request, or infer with `git rev-parse --show-toplevel | xargs basename`
-- **env vars**: verify `SONAR_TOKEN` and `SONAR_ORG` are set before proceeding
+- **severity**: from user request or default `high`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
+- **repo**: from user request, or infer with `git rev-parse --show-toplevel | xargs basename`. Must contain only alphanumeric characters, hyphens, and underscores — reject if it contains shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `\`).
+- **env vars**: verify `SONAR_TOKEN` and `SONAR_ORG` are set before proceeding.
 
 ### 1. Run the scan script
 
 ```bash
-node ~/.claude/agents/scripts/sonarcloud-scan/scan.mjs \
-  --severity <severity> \
-  --repo <repo>
+node ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs \
+  --severity '<severity>' \
+  --repo '<repo>'
 ```
 
 The script handles project verification, pagination, severity filtering, and outputs structured JSON.

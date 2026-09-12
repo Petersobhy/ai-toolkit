@@ -64,7 +64,7 @@ metadata:
 - Export all pure functions so they can be imported by tests
 - Guard the CLI entrypoint: `if (process.argv[1] === fileURLToPath(import.meta.url)) { main()... }`
 - Output structured JSON to stdout; print errors to stderr with a non-zero exit code
-- Installed by the CLI to `~/.claude/agents/scripts/<skill-name>/`
+- Installed by the CLI to `~/.ai-toolkit/scripts/<skill-name>/` (separate from Claude Code's config directory)
 
 **Test conventions:**
 - Use `node:test` + `node:assert/strict` (no external test runner)

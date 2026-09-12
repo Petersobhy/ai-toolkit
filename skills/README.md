@@ -13,8 +13,8 @@ skills/
 ```
 
 The CLI installs:
-- `SKILL.md` → `~/.claude/agents/<skill-name>.md`
-- Companion scripts → `~/.claude/agents/scripts/<skill-name>/`
+- `SKILL.md` → `~/.claude/agents/<skill-name>.md` (Claude Code agents directory)
+- Companion scripts → `~/.ai-toolkit/scripts/<skill-name>/` (separate from Claude config)
 
 ## Structure of SKILL.md
 
@@ -70,7 +70,9 @@ npx @petersobhy/ai-toolkit add <skill-name>
 
 Or manually:
 ```bash
-cp skills/<skill-name>/SKILL.md ~/.claude/agents/<skill-name>.md
+cp skills/<skill-name>/SKILL.md ~/.claude/agents/<skill-name>.md   # skill definition
+mkdir -p ~/.ai-toolkit/scripts/<skill-name>
+cp skills/<skill-name>/*.mjs ~/.ai-toolkit/scripts/<skill-name>/   # companion scripts (if any)
 ```
 
 Then restart Claude Code.
