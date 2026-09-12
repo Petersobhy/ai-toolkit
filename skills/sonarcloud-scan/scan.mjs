@@ -34,7 +34,7 @@ const SONAR_TYPE_MAP = {
 };
 
 export function parseArgs(argv) {
-  const out = { severity: 'high', repo: null, all: false, categories: DEFAULT_CATEGORIES };
+  const out = { severity: 'critical', repo: null, all: false, categories: DEFAULT_CATEGORIES };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--severity' && argv[i + 1]) out.severity = argv[++i];
     else if (argv[i] === '--repo' && argv[i + 1]) out.repo = argv[++i];
@@ -52,26 +52,46 @@ export function stripProjectKey(component, projectKey) {
 }
 
 export function buildResult({ projectKey, severity, categories, rawIssues, rawHotspots, probFilter }) {
+  const repo = projectKey.includes(':') ? projectKey.split(':')[1] : projectKey;
   const filteredHotspots = rawHotspots.filter(h => probFilter.includes(h.vulnerabilityProbability));
   return {
     project: projectKey,
     severity,
     categories,
     issues: rawIssues.map(i => ({
-      category: (i.type ?? 'VULNERABILITY').toLowerCase(),
-      severity: i.severity,
-      rule:     i.rule,
-      file:     stripProjectKey(i.component, projectKey),
-      line:     i.line ?? null,
-      message:  i.message,
-      effort:   i.effort ?? null,
+      // common fields
+      source:        'sonarcloud',
+      type:          (i.type ?? 'VULNERABILITY').toLowerCase(),
+      severity:      i.severity,
+      title:         i.message,
+      repo,
+      file:          stripProjectKey(i.component, projectKey),
+      line:          i.line ?? null,
+      resource:      null,
+      fix_available: !!i.effort,
+      fix:           null,
+      categories:    [(i.type ?? 'VULNERABILITY').toLowerCase()],
+      // sonarcloud-specific
+      category:      (i.type ?? 'VULNERABILITY').toLowerCase(),
+      rule:          i.rule,
+      effort:        i.effort ?? null,
     })),
     hotspots: filteredHotspots.map(h => ({
-      probability: h.vulnerabilityProbability,
-      rule:        h.ruleKey,
-      file:        stripProjectKey(h.component, projectKey),
-      line:        h.line ?? null,
-      message:     h.message,
+      // common fields
+      source:        'sonarcloud',
+      type:          'hotspot',
+      severity:      h.vulnerabilityProbability,
+      title:         h.message,
+      repo,
+      file:          stripProjectKey(h.component, projectKey),
+      line:          h.line ?? null,
+      resource:      null,
+      fix_available: false,
+      fix:           null,
+      categories:    ['hotspot'],
+      // sonarcloud-specific
+      probability:   h.vulnerabilityProbability,
+      rule:          h.ruleKey,
     })),
     summary: {
       total_issues:   rawIssues.length,

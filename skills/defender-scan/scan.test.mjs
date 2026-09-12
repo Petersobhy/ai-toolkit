@@ -6,12 +6,14 @@ import { EventEmitter } from 'events';
 import {
   parseArgs,
   rgFromId,
+  resourceTypeFromId,
   parseCves,
   buildVulnerability,
   buildRecommendation,
   buildAlert,
   buildResult,
-  SEVERITY_LEVELS,
+  severityAtLeast,
+  severityLabels,
   CATEGORIES,
   DEFAULT_CATEGORIES,
   get,
@@ -22,7 +24,7 @@ import {
 
 test('parseArgs: defaults', () => {
   const r = parseArgs([]);
-  assert.equal(r.severity, 'high');
+  assert.equal(r.severity, 'critical');
   assert.equal(r.resourceGroup, null);
 });
 
@@ -48,7 +50,7 @@ test('parseArgs: all defaults to false', () => {
 });
 
 test('parseArgs: categories defaults to DEFAULT_CATEGORIES', () => {
-  assert.deepEqual(parseArgs([]).categories, DEFAULT_CATEGORIES);
+  assert.deepEqual(parseArgs([]).categories, ['vulnerabilities', 'container']);
 });
 
 test('parseArgs: --categories parses comma-separated list', () => {
@@ -61,19 +63,31 @@ test('parseArgs: --categories all expands to full list', () => {
   assert.deepEqual(r.categories, CATEGORIES);
 });
 
-// ---- SEVERITY_LEVELS ----
+// ---- severityAtLeast / severityLabels ----
 
-test('SEVERITY_LEVELS: critical is only High', () => {
-  assert.deepEqual(SEVERITY_LEVELS.critical, ['High']);
+test('severityAtLeast: critical accepts Critical only', () => {
+  assert.ok(severityAtLeast('Critical', 'critical'));
+  assert.ok(!severityAtLeast('High', 'critical'));
 });
 
-test('SEVERITY_LEVELS: high includes Medium but not Low', () => {
-  assert.ok(SEVERITY_LEVELS.high.includes('Medium'));
-  assert.ok(!SEVERITY_LEVELS.high.includes('Low'));
+test('severityAtLeast: high accepts Critical and High but not Medium', () => {
+  assert.ok(severityAtLeast('Critical', 'high'));
+  assert.ok(severityAtLeast('High', 'high'));
+  assert.ok(!severityAtLeast('Medium', 'high'));
 });
 
-test('SEVERITY_LEVELS: all includes Informational', () => {
-  assert.ok(SEVERITY_LEVELS.all.includes('Informational'));
+test('severityAtLeast: all accepts Informational', () => {
+  assert.ok(severityAtLeast('Informational', 'all'));
+});
+
+test('severityLabels: critical returns only Critical', () => {
+  assert.deepEqual(severityLabels('critical'), ['Critical']);
+});
+
+test('severityLabels: high returns Critical and High', () => {
+  assert.ok(severityLabels('high').includes('Critical'));
+  assert.ok(severityLabels('high').includes('High'));
+  assert.ok(!severityLabels('high').includes('Medium'));
 });
 
 // ---- rgFromId ----
@@ -89,6 +103,21 @@ test('rgFromId: returns null when no resourceGroups segment', () => {
 
 test('rgFromId: handles null', () => {
   assert.equal(rgFromId(null), null);
+});
+
+// ---- resourceTypeFromId ----
+
+test('resourceTypeFromId: extracts resource type from ARM id', () => {
+  const id = '/subscriptions/abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myacr';
+  assert.equal(resourceTypeFromId(id), 'registries');
+});
+
+test('resourceTypeFromId: returns null when no providers segment', () => {
+  assert.equal(resourceTypeFromId('/subscriptions/abc'), null);
+});
+
+test('resourceTypeFromId: handles null', () => {
+  assert.equal(resourceTypeFromId(null), null);
 });
 
 // ---- parseCves ----
@@ -133,7 +162,7 @@ const mockAssessment = {
 };
 
 test('buildVulnerability: maps fields correctly for severity=high', () => {
-  const v = buildVulnerability(mockAssessment, SEVERITY_LEVELS.high);
+  const v = buildVulnerability(mockAssessment, 'high');
   assert.equal(v.package, 'lodash');
   assert.equal(v.resource, 'myacr');
   assert.equal(v.resource_group, 'prod-rg');
@@ -143,16 +172,16 @@ test('buildVulnerability: maps fields correctly for severity=high', () => {
 });
 
 test('buildVulnerability: only includes CVEs at or above severity', () => {
-  const v = buildVulnerability(mockAssessment, SEVERITY_LEVELS.high); // High + Medium only
-  assert.equal(v.cves.length, 2);
-  assert.ok(v.cves.every(c => ['High', 'Medium'].includes(c.severity)));
+  // high = High and above (Critical+High), Medium is below
+  const v = buildVulnerability(mockAssessment, 'high');
+  assert.equal(v.cves.length, 1); // only CVE-2026-001 (High)
+  assert.ok(v.cves.every(c => ['High'].includes(c.severity)));
 });
 
 test('buildVulnerability: returns null when no CVEs match severity filter', () => {
-  const result = buildVulnerability(mockAssessment, SEVERITY_LEVELS.critical); // High only
-  // only CVE-2026-001 (High) matches → not null
-  assert.notEqual(result, null);
-  assert.equal(result.cves.length, 1);
+  // critical = Critical only; mock CVEs are High/Medium/Low → all filtered out
+  const result = buildVulnerability(mockAssessment, 'critical');
+  assert.equal(result, null);
 });
 
 test('buildVulnerability: returns null when all CVEs below threshold', () => {
@@ -167,7 +196,7 @@ test('buildVulnerability: returns null when all CVEs below threshold', () => {
       },
     },
   };
-  assert.equal(buildVulnerability(lowOnly, SEVERITY_LEVELS.critical), null);
+  assert.equal(buildVulnerability(lowOnly, 'critical'), null);
 });
 
 // ---- buildRecommendation ----
@@ -242,7 +271,7 @@ test('buildResult: handles null secure score', () => {
 });
 
 test('buildResult: summary counts match arrays', () => {
-  const vuln  = [buildVulnerability(mockAssessment, SEVERITY_LEVELS.high)];
+  const vuln  = [buildVulnerability(mockAssessment, 'high')];
   const rec   = [buildRecommendation(mockAssessment, mockMeta)];
   const alert = [buildAlert(mockAlert)];
   const result = buildResult({ subscription: 'sub', severity: 'high', secureScore: null, vulnerabilities: vuln, recommendations: rec, alerts: alert });

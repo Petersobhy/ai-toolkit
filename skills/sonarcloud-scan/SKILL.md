@@ -5,8 +5,8 @@ when_to_use: "Use when asked to: scan a repo for SonarCloud vulnerabilities, che
 allowed-tools: Bash
 arguments:
   - name: severity
-    description: "Minimum severity to surface. Options: critical, high, medium, all. Default: high"
-    default: high
+    description: "Minimum severity to surface. Options: critical, high, medium, all. Default: critical"
+    default: critical
   - name: repo
     description: "Repository name to scan (e.g. my-service). Omit to infer from current git directory."
   - name: categories
@@ -76,7 +76,7 @@ If missing, reinstall the skill: `npx @petersobhy/ai-toolkit add sonarcloud-scan
 
 ### 0. Resolve and validate arguments
 
-- **severity**: from user request or default `high`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
+- **severity**: from user request or default `critical`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
 - **repo**: from user request, or infer with `git rev-parse --show-toplevel | xargs basename`. Must contain only alphanumeric characters, hyphens, and underscores — reject if it contains shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `\`).
 - **env vars**: verify `SONAR_TOKEN` and `SONAR_ORG` are set before proceeding.
 
@@ -122,24 +122,34 @@ Clearly separate hotspots from confirmed vulnerabilities — hotspots require ma
 
 ### 4. Report findings
 
-**Vulnerabilities:**
+Always start with a one-line scan header:
+> **Scan:** my-service · severity: critical · categories: vulnerability · page 1 (use --all for full scan)
 
-| File | Line | Rule | Severity | Issue | Effort |
+Then emit **one unified findings table**, sorted by severity (BLOCKER → CRITICAL) then effort ascending:
+
+| Source | Type | Severity | Title | Repo | File | Line | Fix Available | Fix |
+|---|---|---|---|---|---|---|---|---|
+| sonarcloud | vulnerability | BLOCKER | Hardcoded credentials | my-service | src/auth/login.ts | 42 | Yes | null |
+| sonarcloud | hotspot | HIGH | Weak encryption algorithm | my-service | src/api/handler.ts | 87 | No | null |
+
+- Hotspots use `vulnerabilityProbability` in the Severity column
+- `Fix Available` for issues = whether `effort` is set; for hotspots = always No
+
+Then a summary table:
+
+| Metric | Value |
+|---|---|
+| Project | org:repo |
+| Issues (BLOCKER) | N |
+| Issues (CRITICAL) | N |
+| Hotspots (HIGH) | N |
+| Hotspots (MEDIUM) | N |
+
+Then a top-findings table (highest severity first, lowest effort first):
+
+| # | File | Line | Rule | Severity | Effort |
 |---|---|---|---|---|---|
-| src/auth/login.ts | 42 | typescript:S2068 | CRITICAL | Hardcoded credentials | 5min |
-
-**Security Hotspots (manual review required):**
-
-| File | Line | Rule | Probability | Issue |
-|---|---|---|---|---|
-| src/api/handler.ts | 87 | typescript:S4787 | HIGH | Encryption algorithm weak |
-
-Follow with:
-- Overall risk summary (X confirmed vulnerabilities, Y hotspots to review)
-- Top remediation priorities (highest severity first, lowest effort first)
-- Suggested next action: fix inline, open a ticket, or escalate to security lead
-
-Do **not** create tickets automatically — suggest the action and let the user decide.
+| 1 | src/auth.ts | 42 | typescript:S2068 | BLOCKER | 5min |
 
 ---
 

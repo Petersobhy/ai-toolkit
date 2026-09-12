@@ -5,13 +5,13 @@ when_to_use: "Use when asked to: check Azure cloud posture, surface Defender for
 allowed-tools: Bash
 arguments:
   - name: severity
-    description: "Minimum severity to surface. Options: critical, high, medium, all. Default: high"
-    default: high
+    description: "Minimum severity to surface. Options: critical, high, medium, all. Default: critical"
+    default: critical
   - name: resource-group
     description: "Azure resource group to limit scope (optional). Omit to scan the entire subscription."
   - name: categories
-    description: "Comma-separated categories to fetch. Options: vulnerabilities, alerts, recommendations, compute, networking, data, container, identityandaccess, appservices. Default: vulnerabilities,alerts"
-    default: "vulnerabilities,alerts"
+    description: "Comma-separated categories to fetch. Options: vulnerabilities, alerts, recommendations, compute, networking, data, container, identityandaccess, appservices. Default: vulnerabilities,container"
+    default: "vulnerabilities,container"
   - name: all
     description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
 argument-hint: "[severity: critical|high|medium|all] [--resource-group <rg-name>] [--categories vulnerabilities,alerts] [--all]"
@@ -86,10 +86,10 @@ Defender uses High / Medium / Low / Informational (no "Critical" tier):
 
 | Skill severity | Defender levels surfaced |
 |---|---|
-| `critical` | High only |
-| `high` | High, Medium |
-| `medium` | High, Medium, Low |
-| `all` | High, Medium, Low, Informational |
+| `critical` | Critical, High (alerts can be Critical; assessments max at High) |
+| `high` | Critical, High, Medium |
+| `medium` | Critical, High, Medium, Low |
+| `all` | Critical, High, Medium, Low, Informational |
 
 ---
 
@@ -97,8 +97,8 @@ Defender uses High / Medium / Low / Informational (no "Critical" tier):
 
 ### 0. Resolve and validate arguments
 
-- **severity**: from user request or default `high`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
-- **categories**: from user request or default `vulnerabilities,alerts`. Valid values: `vulnerabilities`, `alerts`, `recommendations`, `compute`, `networking`, `data`, `container`, `identityandaccess`, `appservices`.
+- **severity**: from user request or default `critical`. Must be one of: `critical`, `high`, `medium`, `all`. Reject any other value before running the script.
+- **categories**: from user request or default `vulnerabilities,container`. Valid values: `vulnerabilities`, `alerts`, `recommendations`, `compute`, `networking`, `data`, `container`, `identityandaccess`, `appservices`.
 - **resource-group**: from user request, or omit for full subscription scan. If provided, must contain only alphanumeric characters, hyphens, and underscores — reject if it contains shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``, `(`, `)`, `<`, `>`, `\`).
 - **AZURE_SUBSCRIPTION_ID**: check env var first. If unset, auto-detect silently:
   ```bash
@@ -152,37 +152,38 @@ For each fixable vulnerability, note the exact `fix_version` — this goes direc
 
 ### 4. Report findings
 
-Always start the report with a header line showing what was fetched:
-> **Scan:** Ont-Prod1 · severity: high · categories: vulnerabilities, alerts · page 1 of results (pass --all for full scan)
+Always start with a one-line scan header:
+> **Scan:** Ont-Prod1 · severity: critical · categories: vulnerabilities, alerts · page 1 (use --all for full scan)
 
-**Secure Score:** X / Y (Z%) — if `secure_score` is null, state clearly: "Secure Score not available (requires Defender CSPM plan)" — do not silently omit it.
+**Secure Score:** X / Y (Z%) — if `secure_score` is null, state: "Secure Score not available (requires Defender CSPM plan)"
 
-**Active Alerts** (only if `alerts` category was requested):
+Then emit **one unified findings table**, sorted by severity then CVSS descending:
 
-| Alert | Severity | Status | Compromised Resource |
-|---|---|---|---|
-| Suspicious login | High | Active | vm-prod-001 |
+| Source | Type | Severity | Title | Resource | File | Line | Fix Available | Fix |
+|---|---|---|---|---|---|---|---|---|
+| defender | vulnerability | High | Update netty-codec-http2 | spark-fips | null | null | Yes | 4.2.16.Final |
+| defender | alert | High | Suspicious login | vm-prod-001 | null | null | No | null |
+| defender | recommendation | High | Enable MFA | Subscription | null | null | No | Go to Azure AD... |
 
-If alerts array is empty, state: "No active alerts returned — verify Defender for Cloud alerts are enabled on this subscription."
+- Omit the `file` and `line` columns if all values are null (they always will be for Defender)
+- If alerts array is empty, add a note below the table: "No active alerts — verify Defender for Cloud alerts are enabled on this subscription"
 
-**Software Vulnerabilities** (only if `vulnerabilities` category was requested — fixable first, grouped by image):
+Then a summary table:
 
-| Package | Language | CVE | Severity | CVSS | Fix Version | Resource |
-|---|---|---|---|---|---|---|
-| netty-codec-http2 | java | CVE-2026-56819 | High | 7.5 | 4.2.16.Final | spark-fips |
+| Metric | Value |
+|---|---|
+| Secure Score | X / Y (Z%) |
+| Alerts (Critical) | N |
+| Alerts (High) | N |
+| Vulnerabilities — fixable | N |
+| Vulnerabilities — no fix | N |
+| Recommendations (High) | N |
 
-**Cloud Posture Recommendations** (only if `recommendations` or a resource category was requested):
+Then a top-findings table (fixable first, ranked by CVSS × count):
 
-| Recommendation | Category | Severity | Resource | Remediation |
-|---|---|---|---|---|
-| Enable MFA | identityandaccess | High | Subscription | Go to Azure AD... |
-
-Follow with:
-- Overall risk summary (X High CVEs, Y Medium, Z fixable)
-- Top 3 immediate actions ranked by CVSS × volume
-- Suggested next action: open a ticket, apply the Dockerfile patch inline, or escalate to the security lead
-
-Do **not** create tickets automatically — suggest the action and let the user decide.
+| # | Type | Title | Resource | CVSS | Fix |
+|---|---|---|---|---|---|
+| 1 | vulnerability | Update netty-codec-http2 | spark-fips (ACR) | 9.8 | 4.2.16.Final |
 
 ---
 

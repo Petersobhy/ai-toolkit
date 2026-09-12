@@ -20,7 +20,7 @@ import {
 
 test('parseArgs: defaults when no args', () => {
   const result = parseArgs([]);
-  assert.equal(result.severity, 'high');
+  assert.equal(result.severity, 'critical');
   assert.equal(result.repo, null);
   assert.deepEqual(result.categories, DEFAULT_CATEGORIES);
 });
@@ -34,7 +34,7 @@ test('parseArgs: reads --severity and --repo', () => {
 test('parseArgs: unknown flags do not crash', () => {
   const result = parseArgs(['--unknown', 'foo', '--repo', 'svc']);
   assert.equal(result.repo, 'svc');
-  assert.equal(result.severity, 'high');
+  assert.equal(result.severity, 'critical');
 });
 
 test('parseArgs: --all sets all flag', () => {

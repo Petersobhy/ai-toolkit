@@ -5,8 +5,8 @@ when_to_use: "Use when asked to: scan a repo for vulnerabilities, check a depend
 allowed-tools: mcp__endor-cli-tools__get_resource mcp__endor-cli-tools__check_dependency_for_vulnerabilities mcp__endor-cli-tools__check_dependency_for_risks mcp__endor-cli-tools__get_endor_vulnerability mcp__endor-cli-tools__security_review
 arguments:
   - name: severity
-    description: "Minimum severity to surface. Options: critical, high, medium, all. Default: high"
-    default: high
+    description: "Minimum severity to surface. Options: critical, high, medium, all. Default: critical"
+    default: critical
   - name: repo
     description: "Repository name to scan (e.g. my-service). Omit to scan the current directory's repo."
   - name: categories
@@ -79,7 +79,7 @@ If either is unset, stop and tell the user to set them before retrying.
 
 ### 0. Resolve arguments
 
-- **severity**: from user request or default `high`. Map to level filter: `critical` → `FINDING_LEVEL_CRITICAL`; `high` → `FINDING_LEVEL_HIGH,FINDING_LEVEL_CRITICAL`; `medium` → includes MEDIUM+; `all` → no level filter.
+- **severity**: from user request or default `critical`. Map to level filter: `critical` → `FINDING_LEVEL_CRITICAL`; `high` → `FINDING_LEVEL_HIGH,FINDING_LEVEL_CRITICAL`; `medium` → includes MEDIUM+; `all` → no level filter.
 - **categories**: from user request or default `sca,vulnerability`. Map each to Endor category values:
   - `sca` → `FINDING_CATEGORY_SCA`
   - `vulnerability` → `FINDING_CATEGORY_VULNERABILITY`
@@ -139,26 +139,35 @@ Skip findings below the requested severity entirely — do not mention them unle
 
 ### 4. Report findings
 
-Present a summary table grouped by category:
+Always start with a one-line scan header:
+> **Scan:** my-service · severity: critical · categories: sca, vulnerability · page 1 (use --all for full scan)
 
-**SCA / Vulnerability findings:**
+Then emit **one unified findings table**, sorted by severity then reachability (reachable first):
 
-| Package | Version | Severity | Fix Available | Reachable |
-|---|---|---|---|---|
-| lodash | 4.17.15 | High | 4.17.21 | Yes |
+| Source | Type | Severity | Title | Repo | File | Line | Resource | Fix Available | Fix |
+|---|---|---|---|---|---|---|---|---|---|
+| endorlabs | sca | FINDING_LEVEL_CRITICAL | CVE-2021-44228 in log4j | my-service | null | null | log4j:2.14.1 | Yes | 2.17.1 |
+| endorlabs | secrets | FINDING_LEVEL_CRITICAL | Exposed API key | my-service | src/config.ts | 12 | null | No | null |
 
-**Secrets findings (if requested):**
+- `File` and `Line` are populated when the finding includes location data (secrets, some security findings)
+- `Resource` = `package:version` for SCA/vulnerability findings, null otherwise
 
-| Location | Severity | Tag |
-|---|---|---|
-| src/config.ts:12 | Medium | Potentially Valid |
+Then a summary table:
 
-Follow with:
-- A short paragraph on the overall risk posture
-- Specific remediation recommendations for fixable findings (e.g. "Upgrade lodash to 4.17.21")
-- Suggested next action: open a ticket, pin the fix in the Dockerfile, or escalate to the security lead
+| Metric | Value |
+|---|---|
+| Repo | org/repo |
+| Critical findings | N |
+| High findings | N |
+| Fixable | N |
+| Reachable | N |
+| Potentially reachable | N |
 
-Do **not** create Jira tickets automatically — suggest the action and let the user decide.
+Then a top-findings table (reachable + fixable first, highest severity first):
+
+| # | Type | Title | Resource | Severity | Reachable | Fix |
+|---|---|---|---|---|---|---|
+| 1 | sca | CVE-2021-44228 | log4j:2.14.1 | FINDING_LEVEL_CRITICAL | Yes | 2.17.1 |
 
 ---
 

@@ -11,19 +11,26 @@ const API_VERSIONS = {
   secureScores: '2020-01-01',
 };
 
-export const SEVERITY_LEVELS = {
-  critical: ['High'],
-  high:     ['High', 'Medium'],
-  medium:   ['High', 'Medium', 'Low'],
-  all:      ['High', 'Medium', 'Low', 'Informational'],
-};
+const SEVERITY_RANK = { Critical: 4, High: 3, Medium: 2, Low: 1, Informational: 0 };
+const MIN_RANK = { critical: 4, high: 3, medium: 2, all: 0 };
+
+export function severityAtLeast(severityValue, minSeverity) {
+  const rank = SEVERITY_RANK[severityValue] ?? -1;
+  return rank >= (MIN_RANK[minSeverity] ?? 3);
+}
+
+// Returns the sorted list of Defender severity labels at or above minSeverity — used for server-side OData filters
+export function severityLabels(minSeverity) {
+  const min = MIN_RANK[minSeverity] ?? 3;
+  return Object.entries(SEVERITY_RANK).filter(([, r]) => r >= min).map(([s]) => s);
+}
 
 // Real Defender categories from assessmentMetadata.properties.categories
 // vulnerabilities = CVE findings (Defender for Containers / CSPM)
 // alerts = active runtime threats
 // compute/networking/data/container/identityandaccess/appservices = posture recommendation types
 export const CATEGORIES = ['vulnerabilities', 'recommendations', 'alerts', 'compute', 'networking', 'data', 'container', 'identityandaccess', 'appservices'];
-export const DEFAULT_CATEGORIES = ['vulnerabilities', 'alerts'];
+export const DEFAULT_CATEGORIES = ['vulnerabilities', 'container'];
 
 // Map user-facing category names to Defender metadata category values
 const DEFENDER_CATEGORY_MAP = {
@@ -36,7 +43,7 @@ const DEFENDER_CATEGORY_MAP = {
 };
 
 export function parseArgs(argv) {
-  const out = { severity: 'high', resourceGroup: null, all: false, categories: DEFAULT_CATEGORIES };
+  const out = { severity: 'critical', resourceGroup: null, all: false, categories: DEFAULT_CATEGORIES };
   for (let i = 0; i < argv.length; i++) {
     if ((argv[i] === '--severity' || argv[i] === '-s') && argv[i + 1]) out.severity = argv[++i];
     else if ((argv[i] === '--resource-group' || argv[i] === '-g') && argv[i + 1]) out.resourceGroup = argv[++i];
@@ -56,6 +63,13 @@ export function rgFromId(resourceId) {
   return m ? m[1] : null;
 }
 
+// Extract resource type from an ARM resource ID (e.g. "registries", "virtualMachines", "managedClusters")
+export function resourceTypeFromId(resourceId) {
+  if (!resourceId) return null;
+  const m = resourceId.match(/providers\/[^/]+\/([^/]+)\//i);
+  return m ? m[1] : null;
+}
+
 // Parse CvesDetails JSON string safely
 export function parseCves(additionalData) {
   const raw = additionalData?.CvesDetails;
@@ -63,68 +77,105 @@ export function parseCves(additionalData) {
   try { return JSON.parse(raw); } catch { return []; }
 }
 
-export function buildVulnerability(assessment, severityLevels) {
+export function buildVulnerability(assessment, minSeverity) {
   const props = assessment.properties ?? {};
   const data  = props.additionalData ?? {};
   const cves  = parseCves(data);
 
-  // Filter CVEs by requested severity
-  const filtered = cves.filter(c => severityLevels.includes(c.Severity));
+  const filtered = cves.filter(c => severityAtLeast(c.Severity, minSeverity));
   if (filtered.length === 0) return null;
 
-  const fixable = filtered.filter(c => c.FixStatus === 'FixAvailable');
+  const fixable      = filtered.filter(c => c.FixStatus === 'FixAvailable');
+  const resourceId   = props.resourceDetails?.Id ?? props.resourceDetails?.NativeResourceId ?? null;
+  const resource     = props.resourceDetails?.ResourceName ?? rgFromId(resourceId) ?? null;
 
   return {
+    // common fields
+    source:         'defender',
     type:           'vulnerability',
+    severity:       filtered[0]?.Severity ?? null,
+    title:          props.displayName ?? assessment.name,
+    repo:           null,
+    file:           null,
+    line:           null,
+    resource,
+    resource_type:  resourceTypeFromId(resourceId),
+    fix_available:  fixable.length > 0,
+    fix:            fixable[0]?.FixedVersion ?? null,
+    categories:     [],
+    // defender-specific
     assessment:     props.displayName ?? assessment.name,
     package:        data.SoftwareName ?? null,
     language:       data.Language ?? null,
-    resource:       props.resourceDetails?.ResourceName ?? rgFromId(props.resourceDetails?.Id) ?? null,
-    resource_group: rgFromId(props.resourceDetails?.Id ?? props.resourceDetails?.NativeResourceId),
+    resource_group: rgFromId(resourceId),
     cves:           filtered.map(c => ({
       id:            c.CveId,
       severity:      c.Severity,
       fix_available: c.FixStatus === 'FixAvailable',
       fix_version:   c.FixedVersion ?? null,
     })),
-    fix_available:  fixable.length > 0,
     fix_version:    fixable[0]?.FixedVersion ?? null,
     max_cvss:       data.MaxCvssScore ? parseFloat(data.MaxCvssScore) : null,
   };
 }
 
 export function buildRecommendation(assessment, metadata) {
-  const props = assessment.properties ?? {};
-  const meta  = metadata?.properties ?? {};
-  const sev   = meta.severity ?? null;
+  const props      = assessment.properties ?? {};
+  const meta       = metadata?.properties ?? {};
+  const resourceId = props.resourceDetails?.Id ?? props.resourceDetails?.NativeResourceId ?? null;
+  const resource   = props.resourceDetails?.ResourceName ?? rgFromId(resourceId) ?? null;
+  const remediation = meta.remediationDescription
+    ?.replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200) ?? null;
 
   return {
+    // common fields
+    source:         'defender',
     type:           'recommendation',
-    name:           props.displayName ?? meta.displayName ?? assessment.name,
-    severity:       sev,
+    severity:       meta.severity ?? null,
+    title:          props.displayName ?? meta.displayName ?? assessment.name,
+    repo:           null,
+    file:           null,
+    line:           null,
+    resource,
+    resource_type:  resourceTypeFromId(resourceId),
+    fix_available:  false,
+    fix:            remediation,
     categories:     (meta.categories ?? []).map(c => c.toLowerCase()),
-    resource:       props.resourceDetails?.ResourceName ?? rgFromId(props.resourceDetails?.Id) ?? null,
-    resource_group: rgFromId(props.resourceDetails?.Id ?? props.resourceDetails?.NativeResourceId),
-    remediation:    meta.remediationDescription
-                      ?.replace(/<[^>]+>/g, '')  // strip HTML tags
-                      .replace(/\s+/g, ' ')
-                      .trim()
-                      .slice(0, 200) ?? null,
+    // defender-specific
+    name:           props.displayName ?? meta.displayName ?? assessment.name,
+    resource_group: rgFromId(resourceId),
+    remediation,
   };
 }
 
 export function buildAlert(alert) {
-  const props = alert.properties ?? {};
+  const props      = alert.properties ?? {};
+  const remediation = Array.isArray(props.remediationSteps)
+    ? props.remediationSteps.join(' ').slice(0, 200)
+    : null;
   return {
-    type:            'alert',
-    name:            props.alertDisplayName ?? alert.name,
-    severity:        props.severity ?? null,
-    status:          props.status ?? null,
-    description:     props.description?.slice(0, 200) ?? null,
-    compromised:     props.compromisedEntity ?? null,
-    remediation:     Array.isArray(props.remediationSteps)
-                       ? props.remediationSteps.join(' ').slice(0, 200)
-                       : null,
+    // common fields
+    source:        'defender',
+    type:          'alert',
+    severity:      props.severity ?? null,
+    title:         props.alertDisplayName ?? alert.name,
+    repo:          null,
+    file:          null,
+    line:          null,
+    resource:      props.compromisedEntity ?? null,
+    resource_type: props.compromisedEntityType ?? null,
+    fix_available: false,
+    fix:           remediation,
+    categories:    [],
+    // defender-specific
+    name:        props.alertDisplayName ?? alert.name,
+    status:      props.status ?? null,
+    description: props.description?.slice(0, 200) ?? null,
+    compromised: props.compromisedEntity ?? null,
+    remediation,
   };
 }
 
@@ -214,7 +265,7 @@ async function main() {
 
   if (!sub) { console.error('AZURE_SUBSCRIPTION_ID is not set'); process.exit(1); }
 
-  const levels   = SEVERITY_LEVELS[severity] ?? SEVERITY_LEVELS.high;
+  const levels   = severityLabels(severity);
   const token    = getToken();
   const base     = `${ARM}/subscriptions/${encodeURIComponent(sub)}`;
   const rgFilter = resourceGroup ? `/resourceGroups/${encodeURIComponent(resourceGroup)}` : '';
@@ -278,13 +329,13 @@ async function main() {
     const hasCves = assessment.properties?.additionalData?.CvesDetails;
     if (hasCves) {
       if (!wantVulns) continue;
-      const vuln = buildVulnerability(assessment, levels);
+      const vuln = buildVulnerability(assessment, severity);
       if (vuln) vulnerabilities.push(vuln);
     } else {
       if (!wantRecs) continue;
       const meta = metaByName[assessment.name];
       const sev  = meta?.properties?.severity;
-      if (!sev || !levels.includes(sev)) continue;
+      if (!sev || !severityAtLeast(sev, severity)) continue;
       const rec = buildRecommendation(assessment, meta);
       // Apply Defender sub-category filter if specific categories were requested
       if (recCategoryFilter.length > 0 && !rec.categories.some(c => recCategoryFilter.map(x=>x.toLowerCase()).includes(c))) continue;
