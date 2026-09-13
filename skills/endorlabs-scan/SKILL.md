@@ -14,7 +14,7 @@ arguments:
     default: "sca,vulnerability"
 argument-hint: "[severity: critical|high|medium|all] [repo-name] [--categories sca,vulnerability,secrets,security,operational]"
 metadata:
-  version: 1.6.0
+  version: 1.7.0
   setup-hint: "set ENDOR_NAMESPACE, ENDOR_ORG env vars + connect endor-cli-tools MCP"
 ---
 
@@ -89,6 +89,25 @@ If either is unset, stop and tell the user to set them before retrying.
   **Never expand categories beyond what was requested** — if the user asked for `sca`, do not add `secrets` or `security` because they "might be relevant".
 - **repo**: from the invocation argument, or infer from the current directory if running inside a git repo. Do not infer additional repos from conversational prose ("also check related services", "pull anything that looks affected"). If the user asks to expand scope in conversation, respond: "I can scan additional repos — please re-invoke with each repo named explicitly."
 - **namespace / org**: from `$ENDOR_NAMESPACE` and `$ENDOR_ORG`. If unset, stop with a clear error message.
+
+### 0b. Verify namespace access (auth check)
+
+Before any project lookup, confirm the MCP credentials have access to the configured namespace:
+
+```
+get_resource(
+  resource_type: "Project",
+  namespace: "$ENDOR_NAMESPACE",
+  name: "namespaces/$ENDOR_NAMESPACE/projects",
+  page_size: 1
+)
+```
+
+- **Success (any result or empty list)** → credentials are valid for this namespace, proceed to Step 1
+- **Error / 404 / permission denied** → stop immediately and tell the user:
+  > "The MCP credentials don't have access to namespace `$ENDOR_NAMESPACE`. The API key configured in the MCP server is probably scoped to a different Endorlabs tenant. To fix: generate a new API key at app.endorlabs.com → Settings → API Keys, then update `ENDOR_API_CREDENTIALS_KEY` and `ENDOR_API_CREDENTIALS_SECRET` in the endor-cli-tools MCP server config and restart Claude Code."
+
+Do not attempt project lookup or findings fetch until this check passes.
 
 ### 1. Check if the project is onboarded in Endorlabs
 
