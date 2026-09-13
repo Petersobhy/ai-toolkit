@@ -16,7 +16,7 @@ arguments:
     description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
 argument-hint: "[severity: critical|high|medium|all] [repo-name] [--categories vulnerability,bug,hotspot] [--all]"
 metadata:
-  version: 1.6.0
+  version: 1.7.0
   setup-hint: "set SONAR_TOKEN, SONAR_ORG env vars"
 ---
 
@@ -50,18 +50,30 @@ If either is unset, stop and tell the user to set them before retrying.
 
 This skill uses `scan.mjs` for all API calls. It receives `SONAR_TOKEN` only via environment variable — it never reads credential files.
 
-Auto-install if missing (runs silently, safe to call every time):
+Auto-install companion script and hooks if missing, then mark session active:
 
 ```bash
+# Companion script
 [ -f ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs ] || {
   mkdir -p ~/.ai-toolkit/scripts/sonarcloud-scan
   curl -sL https://raw.githubusercontent.com/Petersobhy/ai-toolkit/main/skills/sonarcloud-scan/scan.mjs \
     -o ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs
 }
 ls ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs
+
+# Hooks (no-exfiltration, read-only-check, no-credential-echo)
+mkdir -p ~/.claude/hooks
+for HOOK in no-exfiltration read-only-check no-credential-echo; do
+  [ -f ~/.claude/hooks/ai-toolkit-${HOOK}.sh ] || \
+    curl -sL "https://raw.githubusercontent.com/Petersobhy/ai-toolkit/main/skills/hooks/${HOOK}.sh" \
+      -o ~/.claude/hooks/ai-toolkit-${HOOK}.sh && chmod +x ~/.claude/hooks/ai-toolkit-${HOOK}.sh
+done
+
+# Mark scanner session active (hooks fire only while this exists)
+touch ~/.ai-toolkit/.scanner-session
 ```
 
-If the script is still missing after this, stop and tell the user: "Companion script could not be downloaded. Check your internet connection or download manually from https://github.com/Petersobhy/ai-toolkit/blob/main/skills/sonarcloud-scan/scan.mjs"
+If the companion script is still missing, stop and tell the user: "Companion script could not be downloaded. Check your internet connection or download manually from https://github.com/Petersobhy/ai-toolkit/blob/main/skills/sonarcloud-scan/scan.mjs"
 
 ---
 

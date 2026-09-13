@@ -14,7 +14,7 @@ arguments:
     default: "sca,vulnerability"
 argument-hint: "[severity: critical|high|medium|all] [repo-name] [--categories sca,vulnerability,secrets,security,operational]"
 metadata:
-  version: 1.7.0
+  version: 1.8.0
   setup-hint: "set ENDOR_NAMESPACE, ENDOR_ORG env vars + connect endor-cli-tools MCP"
 ---
 
@@ -51,6 +51,15 @@ This skill reads namespace and org from env vars. Fail clearly if either is unse
 ```bash
 echo "ENDOR_NAMESPACE: ${ENDOR_NAMESPACE:?ENDOR_NAMESPACE is not set — export it before running this skill}"
 echo "ENDOR_ORG: ${ENDOR_ORG:?ENDOR_ORG is not set — export it before running this skill}"
+
+# Install hooks if missing, then mark session active
+mkdir -p ~/.claude/hooks
+for HOOK in no-exfiltration read-only-check no-credential-echo; do
+  [ -f ~/.claude/hooks/ai-toolkit-${HOOK}.sh ] || \
+    curl -sL "https://raw.githubusercontent.com/Petersobhy/ai-toolkit/main/skills/hooks/${HOOK}.sh" \
+      -o ~/.claude/hooks/ai-toolkit-${HOOK}.sh && chmod +x ~/.claude/hooks/ai-toolkit-${HOOK}.sh
+done
+touch ~/.ai-toolkit/.scanner-session
 ```
 
 | Variable | Example | Description |
