@@ -16,7 +16,7 @@ arguments:
     description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
 argument-hint: "[severity: critical|high|medium|all] [--resource-group <rg-name>] [--categories vulnerabilities,alerts] [--all]"
 metadata:
-  version: 1.5.0
+  version: 1.6.0
   setup-hint: "set AZURE_SUBSCRIPTION_ID env var + run: az login"
 ---
 
@@ -61,12 +61,15 @@ The script sources Azure credentials only from `az account get-access-token` and
 Auto-install if missing (runs silently, safe to call every time):
 
 ```bash
-[ -f ~/.ai-toolkit/scripts/defender-scan/scan.mjs ] || \
-  npx --yes @petersobhy/ai-toolkit@1 add defender-scan 2>/dev/null
+[ -f ~/.ai-toolkit/scripts/defender-scan/scan.mjs ] || {
+  mkdir -p ~/.ai-toolkit/scripts/defender-scan
+  curl -sL https://raw.githubusercontent.com/Petersobhy/ai-toolkit/main/skills/defender-scan/scan.mjs \
+    -o ~/.ai-toolkit/scripts/defender-scan/scan.mjs
+}
 ls ~/.ai-toolkit/scripts/defender-scan/scan.mjs
 ```
 
-If the script is still missing after this, stop and tell the user: "Companion script could not be installed automatically. Run: `npx @petersobhy/ai-toolkit@1 add defender-scan`"
+If the script is still missing after this, stop and tell the user: "Companion script could not be downloaded. Check your internet connection or download manually from https://github.com/Petersobhy/ai-toolkit/blob/main/skills/defender-scan/scan.mjs"
 
 ---
 

@@ -13,14 +13,10 @@ Claude Code skill files. Each skill lives in its own folder and is a self-contai
 ### Install all skills
 
 ```bash
-# Via skills.sh (multi-agent, interactive)
 npx skills add Petersobhy/ai-toolkit
-
-# Via ai-toolkit CLI (installs companion scripts automatically)
-npx @petersobhy/ai-toolkit@1 add --all
 ```
 
-Restart Claude Code after installing.
+Select skills from the interactive picker. Restart Claude Code after installing. Companion scripts download automatically on first use.
 
 ## Folder structure
 
@@ -85,14 +81,12 @@ Key fields:
 ## Installing a skill locally
 
 ```bash
-npx @petersobhy/ai-toolkit add <skill-name>
+npx skills add Petersobhy/ai-toolkit
 ```
 
 Or manually:
 ```bash
-cp skills/<skill-name>/SKILL.md ~/.claude/agents/<skill-name>.md   # skill definition
-mkdir -p ~/.ai-toolkit/scripts/<skill-name>
-cp skills/<skill-name>/*.mjs ~/.ai-toolkit/scripts/<skill-name>/   # companion scripts (if any)
+cp skills/<skill-name>/SKILL.md ~/.claude/commands/<skill-name>.md
 ```
 
-Then restart Claude Code.
+Companion scripts download automatically on first use via the bootstrap in each SKILL.md. Restart Claude Code after installing.

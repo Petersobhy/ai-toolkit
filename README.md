@@ -4,26 +4,26 @@
 
 A growing library of reusable AI skills for Claude Code — each addition maps to a real use case, not a hypothetical one.
 
-## What's here
-
-| Folder | Contents |
-|---|---|
-| `skills/` | Claude Code skill files — reusable AI-assisted procedures |
-| `cli/` | Skill installer CLI — `npx @petersobhy/ai-toolkit` |
-
-## Installing a skill
-
-Requires Node 18+. No additional dependencies.
+## Installing skills
 
 ```bash
-npx @petersobhy/ai-toolkit@1 list                  # see available skills
-npx @petersobhy/ai-toolkit@1 add endorlabs-scan    # install one skill
-npx @petersobhy/ai-toolkit@1 add --all             # install all skills
-npx @petersobhy/ai-toolkit@1 update                # update installed skills
+npx skills add Petersobhy/ai-toolkit
 ```
 
-Skills are installed to `~/.claude/agents/` — no skill file ever lands in a client repo. Restart Claude Code after installing.
+Select the skills you want from the interactive picker. Restart Claude Code after installing.
+
+Skills are installed to `~/.claude/commands/`. Companion scripts download automatically on first use — no separate install step needed.
+
+## Available skills
+
+| Skill | Trigger words | Setup |
+|---|---|---|
+| [defender-scan](skills/defender-scan/SKILL.md) | defender, defender for cloud, azure security | `AZURE_SUBSCRIPTION_ID` + `az login` |
+| [endorlabs-scan](skills/endorlabs-scan/SKILL.md) | endorlabs, endor scan, scan for vulnerabilities | `ENDOR_NAMESPACE`, `ENDOR_ORG` + endor-cli-tools MCP |
+| [sonarcloud-scan](skills/sonarcloud-scan/SKILL.md) | sonarcloud, sonar scan, SAST scan | `SONAR_TOKEN`, `SONAR_ORG` |
+
+Full index with guardrails: [skills/README.md](skills/README.md)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a skill, commit conventions, and the release process.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a skill.

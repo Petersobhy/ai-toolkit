@@ -1,6 +1,6 @@
 # Contributing to ai-toolkit
 
-Developer guide for maintaining the repo, adding skills, and understanding the release process.
+Developer guide for maintaining the repo and adding skills.
 
 ---
 
@@ -8,14 +8,18 @@ Developer guide for maintaining the repo, adding skills, and understanding the r
 
 ```
 ai-toolkit/
-├── skills/               # Claude Code skill files (one .md per skill)
-├── cli/                  # npm CLI — @petersobhy/ai-toolkit
-│   ├── index.js          # CLI entry point (no external dependencies)
-│   ├── package.json      # npm package config
-│   └── .releaserc.json   # semantic-release config
+├── skills/               # Claude Code skill files
+│   ├── <skill-name>/
+│   │   ├── SKILL.md      # skill definition (required)
+│   │   ├── scan.mjs      # companion script (if needed)
+│   │   ├── scan.test.mjs # tests for companion script (required if script exists)
+│   │   └── evals/
+│   │       └── evals.json  # structured test cases
+│   └── README.md         # skills index
 ├── .github/
 │   └── workflows/
-│       └── publish.yml   # CI: runs semantic-release on every push to main
+│       ├── test.yml      # runs companion script tests on every push
+│       └── security.yml  # NVIDIA skillspector scan, SARIF to GitHub Security
 └── CONTRIBUTING.md       # this file
 ```
 
@@ -23,24 +27,14 @@ ai-toolkit/
 
 ## Adding a new skill
 
-Each skill lives in its own folder under `skills/`:
-
-```
-skills/
-├── my-new-skill/
-│   ├── SKILL.md          # skill definition (required)
-│   ├── scan.mjs          # companion script (if needed)
-│   └── scan.test.mjs     # tests for companion script (required if script exists)
-```
-
-Steps:
-
-1. Write and test the skill locally in `~/.claude/agents/<skill-name>.md`
+1. Write and test the skill locally in `~/.claude/commands/<skill-name>.md`
 2. Create `skills/<skill-name>/SKILL.md` — strip all client-specific values, replace with `<YOUR_NAMESPACE>`, `<YOUR_ORG>`, etc.
-3. If the skill needs a companion script, add it alongside `SKILL.md` and write tests in `<name>.test.mjs`
-4. Run tests: `node --test skills/<skill-name>/<name>.test.mjs`
-5. Open a PR with a sample run output in the description
-6. Use a `feat:` commit message — this triggers a minor version bump on merge
+3. If the skill needs a companion script, add `scan.mjs` and write tests in `scan.test.mjs`
+4. Add `evals/evals.json` with at least a happy-path test and one guardrail test
+5. Add a bootstrap block in the Prerequisites section of `SKILL.md` (see existing skills for the curl pattern)
+6. Run tests: `node --test skills/<skill-name>/scan.test.mjs`
+7. Add the skill to the index table in `skills/README.md`
+8. Open a PR with a sample run output in the description
 
 **`SKILL.md` frontmatter structure:**
 ```yaml
@@ -52,11 +46,21 @@ allowed-tools: Bash Read mcp__your-server__tool_name
 arguments:
   - name: severity
     description: "..."
-    default: high
+    default: critical
 argument-hint: "[severity: critical|high|medium|all] [repo-name]"
 metadata:
   version: 1.0.0
 ---
+```
+
+**Companion script bootstrap (copy this pattern into Prerequisites):**
+```bash
+[ -f ~/.ai-toolkit/scripts/<skill-name>/scan.mjs ] || {
+  mkdir -p ~/.ai-toolkit/scripts/<skill-name>
+  curl -sL https://raw.githubusercontent.com/Petersobhy/ai-toolkit/main/skills/<skill-name>/scan.mjs \
+    -o ~/.ai-toolkit/scripts/<skill-name>/scan.mjs
+}
+ls ~/.ai-toolkit/scripts/<skill-name>/scan.mjs
 ```
 
 **Companion script conventions:**
@@ -64,102 +68,33 @@ metadata:
 - Export all pure functions so they can be imported by tests
 - Guard the CLI entrypoint: `if (process.argv[1] === fileURLToPath(import.meta.url)) { main()... }`
 - Output structured JSON to stdout; print errors to stderr with a non-zero exit code
-- Installed by the CLI to `~/.ai-toolkit/scripts/<skill-name>/` (separate from Claude Code's config directory)
 
 **Test conventions:**
 - Use `node:test` + `node:assert/strict` (no external test runner)
 - Test pure functions: argument parsing, data mapping, filtering, output shape
-- Run with: `node --test skills/<skill-name>/<name>.test.mjs`
-
----
-
-## Semantic-release — how it works
-
-Every push to `main` triggers the release workflow. semantic-release reads the commit messages since the last release, determines the version bump, publishes to npm, and creates a GitHub release — automatically.
-
-**No manual tagging. No manual npm publish.**
-
-### Commit message format
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>: <short description>
-
-[optional body]
-```
-
-### Version bump rules
-
-| Commit type | Example | Version bump |
-|---|---|---|
-| `feat:` | `feat: add terraform-plan skill` | Minor (1.0.0 → 1.1.0) |
-| `fix:` | `fix: correct trigger words in endorlabs-scan` | Patch (1.0.0 → 1.0.1) |
-| `docs:` | `docs: update install instructions` | No release |
-| `chore:` | `chore: update node version in workflow` | No release |
-| `refactor:` | `refactor: simplify CLI fetch logic` | No release |
-| `BREAKING CHANGE:` | footer in commit body | Major (1.0.0 → 2.0.0) |
-
-### Breaking change example
-
-```
-feat: rename add command to install
-
-BREAKING CHANGE: `ai-toolkit add` is now `ai-toolkit install`.
-Users must update any scripts that call `add`.
-```
+- Run with: `node --test skills/<skill-name>/scan.test.mjs`
 
 ---
 
 ## Updating a skill
 
 1. Edit `skills/<skill-name>/SKILL.md` (and companion scripts if present)
-2. Bump `metadata.version` in `SKILL.md` frontmatter (patch or minor)
-3. Run tests if a companion script changed: `node --test skills/<skill-name>/<name>.test.mjs`
-4. Commit with `fix:` (bug/correction) or `feat:` (new capability)
-5. Push to main — the CLI package version bumps automatically
+2. Bump `metadata.version` in `SKILL.md` frontmatter
+3. Update `skills.json` version field for that skill
+4. Run tests if a companion script changed
+5. Push to main — CI runs tests and security scan automatically
+
+No publishing step needed. skills.sh picks up changes from main automatically. Companion scripts are downloaded directly from GitHub by the bootstrap in each SKILL.md.
 
 ---
 
-## Maintaining the CLI
-
-The CLI (`cli/index.js`) has no external dependencies — keep it that way. All logic uses Node built-ins (`https`, `fs`, `path`, `os`).
-
-If a new command is needed:
-1. Add a `cmdXxx` async function
-2. Register it in the `commands` map in `main()`
-3. Update the usage block in `main()`
-4. Use a `feat:` commit — triggers a minor bump
-
----
-
-## Release workflow
-
-The workflow at `.github/workflows/publish.yml` runs on every push to `main`.
-
-| Step | What it does |
-|---|---|
-| Checkout (full history) | semantic-release needs the full git log to determine the bump |
-| Install semantic-release | Installs plugins globally — no lockfile needed |
-| Run semantic-release | Analyzes commits, bumps version in `package.json`, publishes to npm, creates GitHub release |
-
-**Required secrets** (set in repo Settings → Secrets → Actions):
-
-| Secret | Purpose |
-|---|---|
-| `NPM_TOKEN` | Granular npm token with publish + bypass 2FA. Scope: all packages. |
-| `GITHUB_TOKEN` | Automatically provided by GitHub Actions — no setup needed. |
-
----
-
-## Local testing before PR
-
-Test the CLI against the live repo before opening a PR:
+## Testing locally
 
 ```bash
-node cli/index.js list
-node cli/index.js add <skill-name>
-node cli/index.js update
-```
+# Test companion scripts
+node --test skills/defender-scan/scan.test.mjs
+node --test skills/sonarcloud-scan/scan.test.mjs
 
-No build step needed — the CLI runs directly with Node 18+.
+# Install a skill via skills.sh
+npx skills add Petersobhy/ai-toolkit
+```

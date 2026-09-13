@@ -7,7 +7,7 @@ Run these manually in Claude Code after installing the skills.
 
 ## How to run
 
-1. Install the skills: `npx @petersobhy/ai-toolkit@1 add --all`
+1. Install the skills: `npx skills add Petersobhy/ai-toolkit`
 2. Open any repo in Claude Code
 3. Send each test prompt below
 4. Record the actual skill response and mark pass or fail

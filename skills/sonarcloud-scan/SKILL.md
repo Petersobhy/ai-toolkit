@@ -16,7 +16,7 @@ arguments:
     description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
 argument-hint: "[severity: critical|high|medium|all] [repo-name] [--categories vulnerability,bug,hotspot] [--all]"
 metadata:
-  version: 1.5.0
+  version: 1.6.0
   setup-hint: "set SONAR_TOKEN, SONAR_ORG env vars"
 ---
 
@@ -53,12 +53,15 @@ This skill uses `scan.mjs` for all API calls. It receives `SONAR_TOKEN` only via
 Auto-install if missing (runs silently, safe to call every time):
 
 ```bash
-[ -f ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs ] || \
-  npx --yes @petersobhy/ai-toolkit@1 add sonarcloud-scan 2>/dev/null
+[ -f ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs ] || {
+  mkdir -p ~/.ai-toolkit/scripts/sonarcloud-scan
+  curl -sL https://raw.githubusercontent.com/Petersobhy/ai-toolkit/main/skills/sonarcloud-scan/scan.mjs \
+    -o ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs
+}
 ls ~/.ai-toolkit/scripts/sonarcloud-scan/scan.mjs
 ```
 
-If the script is still missing after this, stop and tell the user: "Companion script could not be installed automatically. Run: `npx @petersobhy/ai-toolkit@1 add sonarcloud-scan`"
+If the script is still missing after this, stop and tell the user: "Companion script could not be downloaded. Check your internet connection or download manually from https://github.com/Petersobhy/ai-toolkit/blob/main/skills/sonarcloud-scan/scan.mjs"
 
 ---
 
