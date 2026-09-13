@@ -1,6 +1,26 @@
-# Skills
+# Skills index
 
 Claude Code skill files. Each skill lives in its own folder and is a self-contained unit that Claude follows when triggered by a matching prompt.
+
+## Available skills
+
+| Skill | Trigger words | Setup | Guardrails |
+|---|---|---|---|
+| [defender-scan](defender-scan/SKILL.md) | defender, defender for cloud, azure security, cloud posture, security recommendations | `AZURE_SUBSCRIPTION_ID` + `az login` | Read-only · No lateral movement · No exfiltration · No credential echo |
+| [endorlabs-scan](endorlabs-scan/SKILL.md) | endorlabs, endor scan, scan for vulnerabilities, check dependencies, CVE lookup | `ENDOR_NAMESPACE`, `ENDOR_ORG` + endor-cli-tools MCP | Read-only · No lateral movement · No exfiltration · No credential echo |
+| [sonarcloud-scan](sonarcloud-scan/SKILL.md) | sonarcloud, sonar scan, sonar vulnerabilities, SAST scan, code quality scan | `SONAR_TOKEN`, `SONAR_ORG` | Read-only · No lateral movement · No exfiltration · No credential echo |
+
+### Install all skills
+
+```bash
+# Via skills.sh (multi-agent, interactive)
+npx skills add Petersobhy/ai-toolkit
+
+# Via ai-toolkit CLI (installs companion scripts automatically)
+npx @petersobhy/ai-toolkit@1 add --all
+```
+
+Restart Claude Code after installing.
 
 ## Folder structure
 

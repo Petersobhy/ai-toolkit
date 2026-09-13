@@ -16,7 +16,7 @@ arguments:
     description: "Fetch all pages of results. Default fetches first page only (fast). Use --all for a comprehensive scan."
 argument-hint: "[severity: critical|high|medium|all] [--resource-group <rg-name>] [--categories vulnerabilities,alerts] [--all]"
 metadata:
-  version: 1.4.0
+  version: 1.5.0
   setup-hint: "set AZURE_SUBSCRIPTION_ID env var + run: az login"
 ---
 
@@ -58,13 +58,15 @@ echo "AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID:?AZURE_SUBSCRIPTION_ID is n
 
 The script sources Azure credentials only from `az account get-access-token` and the `AZURE_SUBSCRIPTION_ID` env var — it never reads credential files.
 
-Verify it is installed:
+Auto-install if missing (runs silently, safe to call every time):
 
 ```bash
+[ -f ~/.ai-toolkit/scripts/defender-scan/scan.mjs ] || \
+  npx --yes @petersobhy/ai-toolkit@1 add defender-scan 2>/dev/null
 ls ~/.ai-toolkit/scripts/defender-scan/scan.mjs
 ```
 
-If missing, reinstall: `npx @petersobhy/ai-toolkit@1 add defender-scan`
+If the script is still missing after this, stop and tell the user: "Companion script could not be installed automatically. Run: `npx @petersobhy/ai-toolkit@1 add defender-scan`"
 
 ---
 
