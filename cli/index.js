@@ -10,6 +10,7 @@ const BRANCH = 'main';
 const SKILLS_PATH = 'skills';
 const INSTALL_DIR = path.join(os.homedir(), '.claude', 'commands');
 const SCRIPTS_DIR = path.join(os.homedir(), '.ai-toolkit', 'scripts');
+const MANIFEST_FILE = path.join(os.homedir(), '.ai-toolkit', 'installed.json');
 
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
 const API_BASE = `https://api.github.com/repos/${REPO}/contents`;
@@ -47,11 +48,18 @@ async function listAvailable() {
     .map(e => e.name);
 }
 
+function readInstalledManifest() {
+  if (!fs.existsSync(MANIFEST_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(MANIFEST_FILE, 'utf8')); } catch { return {}; }
+}
+
+function writeInstalledManifest(manifest) {
+  fs.mkdirSync(path.dirname(MANIFEST_FILE), { recursive: true });
+  fs.writeFileSync(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
+}
+
 function listInstalled() {
-  if (!fs.existsSync(INSTALL_DIR)) return [];
-  return fs.readdirSync(INSTALL_DIR)
-    .filter(f => f.endsWith('.md'))
-    .map(f => f.replace(/\.md$/, ''));
+  return Object.keys(readInstalledManifest());
 }
 
 // Fetch skill folder contents from GitHub API
@@ -97,6 +105,10 @@ async function installSkill(name, manifest = {}) {
   }
 
   const version = manifest[name]?.version;
+  const installed = readInstalledManifest();
+  installed[name] = { installedAt: new Date().toISOString(), version: version || null };
+  writeInstalledManifest(installed);
+
   console.log(`  ✓ ${name}${version ? ` v${version}` : ''}`);
   return true;
 }
